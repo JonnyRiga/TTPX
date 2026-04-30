@@ -45,7 +45,28 @@ def find_matches(terms, hacktricks_path=HACKTRICKS_PATH):
 
 
 def ask_claude(matches, terms):
-    pass
+    import anthropic
+    client = anthropic.Anthropic()
+
+    context = "\n\n---\n\n".join(
+        f"Source: {path}\n\n{snippet}" for path, snippet in matches
+    )
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1024,
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Based on these HackTricks sections about {' '.join(terms)}:\n\n"
+                f"{context}\n\n"
+                "Provide:\n"
+                "1. Technique summary — what this vulnerability is and how it works\n"
+                "2. Ready-to-use payload or command to exploit it"
+            )
+        }]
+    )
+    return response.content[0].text
 
 
 def main():

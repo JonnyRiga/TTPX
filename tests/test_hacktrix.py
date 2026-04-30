@@ -2,7 +2,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, find_matches
+from hacktrix import extract_snippet, find_matches, ask_claude
+from unittest.mock import patch, MagicMock
 
 
 def test_placeholder():
@@ -85,3 +86,23 @@ def test_find_matches_searches_subdirectories(tmp_path):
     md.write_text("## Handlebars\nRCE via SSTI\n{{7*7}}")
     results = find_matches(["handlebars", "rce", "ssti"], hacktricks_path=tmp_path)
     assert len(results) == 1
+
+
+def test_ask_claude_sends_terms_and_snippets_to_api():
+    matches = [
+        (Path("/fake/ssti.md"), "## Handlebars SSTI\n{{7*7}} = 49 means vulnerable\nRCE via: ...")
+    ]
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text="Summary: SSTI in Handlebars\nPayload: {{7*7}}")]
+
+    with patch("anthropic.Anthropic") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+
+        result = ask_claude(matches, ["handlebars", "ssti", "rce"])
+
+    assert "Summary" in result or "Payload" in result
+    call_kwargs = mock_client.messages.create.call_args[1]
+    assert call_kwargs["model"] == "claude-sonnet-4-6"
+    assert "handlebars" in call_kwargs["messages"][0]["content"].lower()
