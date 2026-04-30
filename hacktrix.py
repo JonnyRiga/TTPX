@@ -8,11 +8,14 @@ HACKTRICKS_PATH = Path.home() / "Tools" / "hacktricks"
 
 
 def extract_snippet(lines, terms, context=20):
-    match_idx = 0
+    match_idx = None
     for i, line in enumerate(lines):
-        if any(term.lower() in line.lower() for term in terms):
+        if terms and any(term.lower() in line.lower() for term in terms):
             match_idx = i
             break
+
+    if match_idx is None:
+        return "\n".join(lines[:context])
 
     heading_idx = 0
     for i in range(match_idx, -1, -1):

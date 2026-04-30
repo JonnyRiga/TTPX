@@ -42,3 +42,9 @@ def test_extract_snippet_is_case_insensitive():
     ]
     result = extract_snippet(lines, ["handlebars"])
     assert "HANDLEBARS RCE here" in result
+
+
+def test_extract_snippet_returns_start_when_no_terms():
+    lines = ["line one", "line two", "line three"]
+    result = extract_snippet(lines, [])
+    assert "line one" in result
