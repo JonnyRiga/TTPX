@@ -28,7 +28,20 @@ def extract_snippet(lines, terms, context=20):
 
 
 def find_matches(terms, hacktricks_path=HACKTRICKS_PATH):
-    pass
+    if not hacktricks_path.exists():
+        return []
+
+    matches = []
+    for md_file in hacktricks_path.rglob("*.md"):
+        try:
+            content = md_file.read_text(errors="ignore")
+        except Exception:
+            continue
+        content_lower = content.lower()
+        if all(term.lower() in content_lower for term in terms):
+            snippet = extract_snippet(content.splitlines(), terms)
+            matches.append((md_file, snippet))
+    return matches
 
 
 def ask_claude(matches, terms):

@@ -48,3 +48,40 @@ def test_extract_snippet_returns_start_when_no_terms():
     lines = ["line one", "line two", "line three"]
     result = extract_snippet(lines, [])
     assert "line one" in result
+
+
+def test_find_matches_returns_match_when_all_terms_present(tmp_path):
+    md = tmp_path / "test.md"
+    md.write_text("## SSTI\nHandlebars template RCE\n{{7*7}}")
+    results = find_matches(["handlebars", "ssti", "rce"], hacktricks_path=tmp_path)
+    assert len(results) == 1
+    assert results[0][0] == md
+
+
+def test_find_matches_excludes_file_missing_a_term(tmp_path):
+    md = tmp_path / "test.md"
+    md.write_text("## SSTI\nHandlebars template injection\n{{7*7}}")
+    results = find_matches(["handlebars", "ssti", "rce"], hacktricks_path=tmp_path)
+    assert results == []
+
+
+def test_find_matches_is_case_insensitive(tmp_path):
+    md = tmp_path / "test.md"
+    md.write_text("## SSTI\nHANDLEBARS RCE template\n{{7*7}}")
+    results = find_matches(["handlebars", "rce"], hacktricks_path=tmp_path)
+    assert len(results) == 1
+
+
+def test_find_matches_returns_empty_list_when_repo_missing(tmp_path):
+    nonexistent = tmp_path / "nonexistent"
+    results = find_matches(["ssti"], hacktricks_path=nonexistent)
+    assert results == []
+
+
+def test_find_matches_searches_subdirectories(tmp_path):
+    subdir = tmp_path / "pentesting" / "web"
+    subdir.mkdir(parents=True)
+    md = subdir / "ssti.md"
+    md.write_text("## Handlebars\nRCE via SSTI\n{{7*7}}")
+    results = find_matches(["handlebars", "rce", "ssti"], hacktricks_path=tmp_path)
+    assert len(results) == 1
