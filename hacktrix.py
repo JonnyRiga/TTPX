@@ -8,7 +8,20 @@ HACKTRICKS_PATH = Path.home() / "Tools" / "hacktricks"
 
 
 def extract_snippet(lines, terms, context=20):
-    pass
+    match_idx = 0
+    for i, line in enumerate(lines):
+        if any(term.lower() in line.lower() for term in terms):
+            match_idx = i
+            break
+
+    heading_idx = 0
+    for i in range(match_idx, -1, -1):
+        if lines[i].startswith("#"):
+            heading_idx = i
+            break
+
+    end_idx = min(heading_idx + context, len(lines))
+    return "\n".join(lines[heading_idx:end_idx])
 
 
 def find_matches(terms, hacktricks_path=HACKTRICKS_PATH):
