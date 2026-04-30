@@ -55,7 +55,7 @@ def ask_claude(matches, terms):
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=1024,
+            max_tokens=2048,
             messages=[{
                 "role": "user",
                 "content": (
@@ -99,6 +99,7 @@ def main():
         print(f"No results for: {' '.join(args.terms)}")
         sys.exit(0)
 
+    print(f"Found {len(matches)} file(s)\n")
     for path, snippet in matches:
         print(f"\n{'=' * 60}")
         print(f"Source: {path.relative_to(HACKTRICKS_PATH)}")

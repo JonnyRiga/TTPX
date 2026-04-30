@@ -8,10 +8,6 @@ from hacktrix import extract_snippet, find_matches, ask_claude
 from unittest.mock import patch, MagicMock
 
 
-def test_placeholder():
-    assert True
-
-
 def test_extract_snippet_returns_heading_and_context():
     lines = [
         "# Introduction",
