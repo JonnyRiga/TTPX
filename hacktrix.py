@@ -73,7 +73,43 @@ def ask_claude(matches, terms):
 
 
 def main():
-    pass
+    parser = argparse.ArgumentParser(
+        prog="hacktrix",
+        description="Search HackTricks for exploitation techniques"
+    )
+    parser.add_argument("terms", nargs="+", help="Search terms (all must match)")
+    parser.add_argument("--exploit", action="store_true",
+                        help="Generate exploit summary and payload via Claude")
+    args = parser.parse_args()
+
+    if args.exploit and not os.environ.get("ANTHROPIC_API_KEY"):
+        print("Set ANTHROPIC_API_KEY to use --exploit")
+        sys.exit(1)
+
+    if not HACKTRICKS_PATH.exists():
+        print(
+            "HackTricks not found. Run: "
+            "git clone https://github.com/HackTricks-wiki/hacktricks ~/Tools/hacktricks"
+        )
+        sys.exit(1)
+
+    matches = find_matches(args.terms)
+
+    if not matches:
+        print(f"No results for: {' '.join(args.terms)}")
+        sys.exit(0)
+
+    for path, snippet in matches:
+        print(f"\n{'=' * 60}")
+        print(f"Source: {path.relative_to(HACKTRICKS_PATH)}")
+        print(f"{'=' * 60}")
+        print(snippet)
+
+    if args.exploit:
+        print(f"\n{'=' * 60}")
+        print("Claude Exploit Analysis")
+        print(f"{'=' * 60}")
+        print(ask_claude(matches, args.terms))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 import sys
+import os
+import subprocess
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
@@ -106,3 +108,21 @@ def test_ask_claude_sends_terms_and_snippets_to_api():
     call_kwargs = mock_client.messages.create.call_args[1]
     assert call_kwargs["model"] == "claude-sonnet-4-6"
     assert "handlebars" in call_kwargs["messages"][0]["content"].lower()
+
+
+def test_cli_no_results():
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "nonexistentterm123xyz"],
+        capture_output=True, text=True
+    )
+    assert "No results for" in result.stdout
+
+
+def test_cli_exploit_flag_without_api_key():
+    env = os.environ.copy()
+    env.pop("ANTHROPIC_API_KEY", None)
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "ssti", "--exploit"],
+        capture_output=True, text=True, env=env
+    )
+    assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
