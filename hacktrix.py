@@ -35,6 +35,26 @@ def extract_snippet(lines, terms, context=20):
     return "\n".join(lines[heading_idx:end_idx])
 
 
+def extract_title(lines, terms, fallback=None):
+    match_idx = None
+    for i, line in enumerate(lines):
+        if terms and any(term.lower() in line.lower() for term in terms):
+            match_idx = i
+            break
+
+    if match_idx is not None:
+        for i in range(match_idx, -1, -1):
+            if lines[i].startswith("#"):
+                title = lines[i].lstrip("#").strip()
+                if len(title) > 45:
+                    title = title[:42] + "..."
+                return title
+
+    if fallback is not None:
+        return fallback.name
+    return "Unknown"
+
+
 def find_matches(terms, search_paths=None):
     if search_paths is None:
         search_paths = [HACKTRICKS_PATH, PATT_PATH]

@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, find_matches, ask_claude, source_label, HACKTRICKS_PATH, PATT_PATH
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, HACKTRICKS_PATH, PATT_PATH
 from unittest.mock import patch, MagicMock
 
 
@@ -157,3 +157,30 @@ def test_source_label_identifies_patt_path():
 def test_source_label_falls_back_to_str_for_unknown_path():
     path = Path("/tmp/unknown.md")
     assert source_label(path) == "/tmp/unknown.md"
+
+
+def test_extract_title_returns_nearest_heading_stripped():
+    lines = [
+        "# Introduction",
+        "Some text",
+        "## Handlebars - RCE",
+        "Handlebars rce payload here",
+    ]
+    assert extract_title(lines, ["handlebars", "rce"]) == "Handlebars - RCE"
+
+
+def test_extract_title_truncates_long_headings():
+    lines = [
+        "## This Is A Very Long Heading That Exceeds Forty Five Characters Total",
+        "handlebars rce content",
+    ]
+    result = extract_title(lines, ["handlebars"])
+    assert len(result) <= 45
+    assert result.endswith("...")
+
+
+def test_extract_title_falls_back_to_filename_when_no_heading(tmp_path):
+    md = tmp_path / "handlebars-rce.md"
+    lines = ["no heading here", "handlebars rce payload"]
+    result = extract_title(lines, ["handlebars"], fallback=md)
+    assert result == "handlebars-rce.md"
