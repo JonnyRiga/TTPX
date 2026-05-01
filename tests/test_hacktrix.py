@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, mirror_file, HACKTRICKS_PATH, PATT_PATH
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, HACKTRICKS_PATH, PATT_PATH
 from unittest.mock import patch, MagicMock
 
 
@@ -263,6 +263,32 @@ def test_strip_markdown_strips_headings():
 def test_strip_markdown_preserves_code_fence_content():
     result = strip_markdown("```javascript\n{{7*7}}\n```")
     assert "{{7*7}}" in result
+
+
+def test_extract_section_returns_matching_section():
+    text = "## Lodash\nlodash content\n\n## Handlebars\nhandlebars content\n\n## Pug\npug content"
+    result = extract_section(text, "handlebars")
+    assert "handlebars content" in result
+    assert "lodash content" not in result
+    assert "pug content" not in result
+
+
+def test_extract_section_stops_at_equal_level_heading():
+    text = "## Handlebars\nsome content\n### Handlebars - RCE\npayload here\n## Lodash\nlodash"
+    result = extract_section(text, "handlebars")
+    assert "payload here" in result
+    assert "lodash" not in result
+
+
+def test_extract_section_returns_none_when_not_found():
+    text = "## Lodash\nlodash content\n## Pug\npug content"
+    assert extract_section(text, "handlebars") is None
+
+
+def test_extract_section_is_case_insensitive():
+    text = "## HANDLEBARS\ncontent here"
+    result = extract_section(text, "handlebars")
+    assert "content here" in result
 
 
 def test_mirror_file_rejects_path_traversal(tmp_path):

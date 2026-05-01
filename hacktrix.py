@@ -253,7 +253,32 @@ def strip_markdown(text):
     return text.strip()
 
 
-def mirror_file(rel_path):
+def extract_section(text, section_term):
+    lines = text.splitlines()
+    start = None
+    heading_level = None
+
+    for i, line in enumerate(lines):
+        if line.startswith("#") and section_term.lower() in line.lower():
+            start = i
+            heading_level = len(line) - len(line.lstrip("#"))
+            break
+
+    if start is None:
+        return None
+
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if lines[i].startswith("#"):
+            level = len(lines[i]) - len(lines[i].lstrip("#"))
+            if level <= heading_level:
+                end = i
+                break
+
+    return "\n".join(lines[start:end]).strip()
+
+
+def mirror_file(rel_path, section=None):
     target = None
     for base in [HACKTRICKS_PATH, PATT_PATH]:
         candidate = base / rel_path
@@ -271,7 +296,17 @@ def mirror_file(rel_path):
         sys.exit(1)
 
     content = target.read_text(errors="ignore")
-    plain = strip_markdown(content)
+
+    if section:
+        raw_section = extract_section(content, section)
+        if raw_section is None:
+            console.print(f"[yellow]Section '{section}' not found — mirroring full file.[/yellow]")
+            plain = strip_markdown(content)
+        else:
+            plain = strip_markdown(raw_section)
+    else:
+        plain = strip_markdown(content)
+
     out = Path.cwd() / (target.stem + ".txt")
     out.write_text(plain)
     console.print(f"[green]Mirrored:[/green] {out.name}  [dim]({len(plain.splitlines())} lines)[/dim]")
@@ -307,13 +342,15 @@ def main():
     group.add_argument("-p", "--payload", nargs="+", metavar="TERM",
                        help="search both sources then send findings to Claude for a syntax-highlighted, ready-to-use payload")
     group.add_argument("-m", "--mirror", metavar="PATH",
-                       help="copy a file from a -f result to cwd as plain text, stripping markdown (alias: htm)")
+                       help="copy a file from a -f result to cwd as plain text, stripping markdown (alias: htm). Optionally add a section term to extract only that section.")
     parser.add_argument("-d", "--details", metavar="CONTEXT",
                         help="error output or context from a previous -p attempt; Claude will analyse and adapt the payload")
+    parser.add_argument("-s", "--section", metavar="TERM",
+                        help="section term to extract when using -m (e.g. handlebars)")
     args = parser.parse_args()
 
     if args.mirror:
-        mirror_file(args.mirror)
+        mirror_file(args.mirror, section=args.section)
         sys.exit(0)
 
     if args.details and args.find:
