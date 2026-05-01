@@ -15,40 +15,47 @@ def source_label(path):
     return str(path)
 
 
-def extract_snippet(lines, terms, context=20):
-    match_idx = None
+def _find_match_idx(lines, terms):
+    if not terms:
+        return None
     for i, line in enumerate(lines):
-        if terms and any(term.lower() in line.lower() for term in terms):
-            match_idx = i
-            break
+        if any(term.lower() in line.lower() for term in terms):
+            return i
+    return None
+
+
+def _find_heading_idx(lines, start):
+    for i in range(start, -1, -1):
+        if lines[i].startswith("#"):
+            return i
+    return 0
+
+
+def extract_snippet(lines, terms, context=20):
+    match_idx = _find_match_idx(lines, terms)
 
     if match_idx is None:
         return "\n".join(lines[:context])
 
-    heading_idx = 0
-    for i in range(match_idx, -1, -1):
-        if lines[i].startswith("#"):
-            heading_idx = i
-            break
-
+    heading_idx = _find_heading_idx(lines, match_idx)
     end_idx = min(heading_idx + context, len(lines))
     return "\n".join(lines[heading_idx:end_idx])
 
 
-def extract_title(lines, terms, fallback=None):
-    match_idx = None
-    for i, line in enumerate(lines):
-        if terms and any(term.lower() in line.lower() for term in terms):
-            match_idx = i
-            break
+_TITLE_MAX_LEN = 45
+
+
+def extract_title(lines, terms, fallback: "Path | None" = None):
+    match_idx = _find_match_idx(lines, terms)
 
     if match_idx is not None:
-        for i in range(match_idx, -1, -1):
-            if lines[i].startswith("#"):
-                title = lines[i].lstrip("#").strip()
-                if len(title) > 45:
-                    title = title[:42] + "..."
-                return title
+        heading_idx = _find_heading_idx(lines, match_idx)
+        heading_line = lines[heading_idx]
+        if heading_line.startswith("#"):
+            title = heading_line.lstrip("#").strip()
+            if len(title) > _TITLE_MAX_LEN:
+                title = title[:_TITLE_MAX_LEN - 3] + "..."
+            return title
 
     if fallback is not None:
         return fallback.name

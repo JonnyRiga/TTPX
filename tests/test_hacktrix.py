@@ -184,3 +184,9 @@ def test_extract_title_falls_back_to_filename_when_no_heading(tmp_path):
     lines = ["no heading here", "handlebars rce payload"]
     result = extract_title(lines, ["handlebars"], fallback=md)
     assert result == "handlebars-rce.md"
+
+
+def test_extract_title_returns_unknown_when_no_terms_and_no_fallback():
+    lines = ["## Some Heading", "some content"]
+    result = extract_title(lines, [])
+    assert result == "Unknown"
