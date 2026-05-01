@@ -35,20 +35,22 @@ def extract_snippet(lines, terms, context=20):
     return "\n".join(lines[heading_idx:end_idx])
 
 
-def find_matches(terms, hacktricks_path=HACKTRICKS_PATH):
-    if not hacktricks_path.exists():
-        return []
-
+def find_matches(terms, search_paths=None):
+    if search_paths is None:
+        search_paths = [HACKTRICKS_PATH, PATT_PATH]
     matches = []
-    for md_file in hacktricks_path.rglob("*.md"):
-        try:
-            content = md_file.read_text(errors="ignore")
-        except Exception:
+    for base_path in search_paths:
+        if not base_path.exists():
             continue
-        content_lower = content.lower()
-        if all(term.lower() in content_lower for term in terms):
-            snippet = extract_snippet(content.splitlines(), terms)
-            matches.append((md_file, snippet))
+        for md_file in base_path.rglob("*.md"):
+            try:
+                content = md_file.read_text(errors="ignore")
+            except Exception:
+                continue
+            content_lower = content.lower()
+            if all(term.lower() in content_lower for term in terms):
+                snippet = extract_snippet(content.splitlines(), terms)
+                matches.append((md_file, snippet))
     return matches
 
 

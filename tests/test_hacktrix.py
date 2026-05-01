@@ -52,7 +52,7 @@ def test_extract_snippet_returns_start_when_no_terms():
 def test_find_matches_returns_match_when_all_terms_present(tmp_path):
     md = tmp_path / "test.md"
     md.write_text("## SSTI\nHandlebars template RCE\n{{7*7}}")
-    results = find_matches(["handlebars", "ssti", "rce"], hacktricks_path=tmp_path)
+    results = find_matches(["handlebars", "ssti", "rce"], search_paths=[tmp_path])
     assert len(results) == 1
     assert results[0][0] == md
 
@@ -60,20 +60,20 @@ def test_find_matches_returns_match_when_all_terms_present(tmp_path):
 def test_find_matches_excludes_file_missing_a_term(tmp_path):
     md = tmp_path / "test.md"
     md.write_text("## SSTI\nHandlebars template injection\n{{7*7}}")
-    results = find_matches(["handlebars", "ssti", "rce"], hacktricks_path=tmp_path)
+    results = find_matches(["handlebars", "ssti", "rce"], search_paths=[tmp_path])
     assert results == []
 
 
 def test_find_matches_is_case_insensitive(tmp_path):
     md = tmp_path / "test.md"
     md.write_text("## SSTI\nHANDLEBARS RCE template\n{{7*7}}")
-    results = find_matches(["handlebars", "rce"], hacktricks_path=tmp_path)
+    results = find_matches(["handlebars", "rce"], search_paths=[tmp_path])
     assert len(results) == 1
 
 
 def test_find_matches_returns_empty_list_when_repo_missing(tmp_path):
     nonexistent = tmp_path / "nonexistent"
-    results = find_matches(["ssti"], hacktricks_path=nonexistent)
+    results = find_matches(["ssti"], search_paths=[nonexistent])
     assert results == []
 
 
@@ -82,7 +82,27 @@ def test_find_matches_searches_subdirectories(tmp_path):
     subdir.mkdir(parents=True)
     md = subdir / "ssti.md"
     md.write_text("## Handlebars\nRCE via SSTI\n{{7*7}}")
-    results = find_matches(["handlebars", "rce", "ssti"], hacktricks_path=tmp_path)
+    results = find_matches(["handlebars", "rce", "ssti"], search_paths=[tmp_path])
+    assert len(results) == 1
+
+
+def test_find_matches_combines_results_from_multiple_paths(tmp_path):
+    src1 = tmp_path / "hacktricks"
+    src2 = tmp_path / "patt"
+    src1.mkdir()
+    src2.mkdir()
+    (src1 / "ssti.md").write_text("## SSTI\nhandlebars rce payload")
+    (src2 / "ssti.md").write_text("## SSTI\nhandlebars rce example")
+    results = find_matches(["handlebars", "rce"], search_paths=[src1, src2])
+    assert len(results) == 2
+
+
+def test_find_matches_skips_missing_path(tmp_path):
+    existing = tmp_path / "exists"
+    existing.mkdir()
+    (existing / "ssti.md").write_text("## SSTI\nhandlebars rce")
+    missing = tmp_path / "missing"
+    results = find_matches(["handlebars", "rce"], search_paths=[existing, missing])
     assert len(results) == 1
 
 
