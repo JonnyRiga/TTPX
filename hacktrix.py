@@ -227,15 +227,34 @@ def display_find_results(matches, terms):
 def main():
     parser = argparse.ArgumentParser(
         prog="hacktrix",
-        description="Search HackTricks + PayloadsAllTheThings for exploitation techniques"
+        description=(
+            "Search HackTricks and PayloadsAllTheThings for exploitation techniques.\n\n"
+            "Use -f to browse matching entries (fast, no API cost), then use -p with\n"
+            "refined terms to generate a ready-to-use payload via Claude. Feed errors\n"
+            "back with -d to get an adapted payload on the next attempt."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  hacktrix -f ssti handlebars\n"
+            "  hacktrix -f lfi php windows\n"
+            "  hacktrix -p ssti handlebars groovy rce\n"
+            "  hacktrix -p sqli union mysql -d \"WAF blocking SELECT keyword\"\n"
+            "  hacktrix -p lfi php -d \"../etc/passwd filtered, got 403\"\n\n"
+            "sources:\n"
+            f"  HackTricks:           ~/Tools/hacktricks\n"
+            f"  PayloadsAllTheThings: ~/Tools/payloadsallthethings\n\n"
+            "environment:\n"
+            "  ANTHROPIC_API_KEY     required for -p / --payload"
+        )
     )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-f", "--find", nargs="+", metavar="TERM",
-                       help="Search and display matching entries (no Claude)")
+                       help="search both sources and display a table of matching entries (no Claude, no API cost)")
     group.add_argument("-p", "--payload", nargs="+", metavar="TERM",
-                       help="Search then generate best payload via Claude")
+                       help="search both sources then send findings to Claude for a syntax-highlighted, ready-to-use payload")
     parser.add_argument("-d", "--details", metavar="CONTEXT",
-                        help="Error or context from a previous attempt (use with -p)")
+                        help="error output or context from a previous -p attempt; Claude will analyse and adapt the payload")
     args = parser.parse_args()
 
     if args.details and args.find:

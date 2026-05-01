@@ -1,0 +1,129 @@
+.TH HACKTRIX 1 "2026-05-01" "hacktrix" "Security Research Tools"
+.SH NAME
+hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniques
+.SH SYNOPSIS
+.B hacktrix
+.B \-f
+.I TERM
+[
+.I TERM
+\&...]
+.br
+.B hacktrix
+.B \-p
+.I TERM
+[
+.I TERM
+\&...]
+[
+.B \-d
+.I CONTEXT
+]
+.SH DESCRIPTION
+.B hacktrix
+searches local clones of HackTricks and PayloadsAllTheThings (PATT) for
+exploitation techniques matching all provided search terms.
+.PP
+Use
+.B \-f
+to browse matching entries as a clean table (fast, no API cost).
+Use
+.B \-p
+to send the matching content to Claude and receive a single,
+syntax\-highlighted, ready\-to\-use payload with a recommendation.
+Feed back errors or context with
+.B \-d
+to get an adapted payload on the next attempt.
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-find " " \fITERM\fR " [" \fITERM\fR ...]"
+Search both sources for files containing all specified terms. Displays a
+table with source tag, matched section title, and relative file path.
+No Claude call is made. Fast and offline\-capable.
+.TP
+.BR \-p ", " \-\-payload " " \fITERM\fR " [" \fITERM\fR ...]"
+Search both sources for files containing all specified terms, then send
+the matched content to Claude. Claude selects the single most impactful
+payload, syntax\-highlights it by language (JavaScript, PHP, Groovy,
+Bash, Python, Java), and provides a one\-line recommendation.
+Requires
+.BR ANTHROPIC_API_KEY .
+.TP
+.BR \-d ", " \-\-details " " \fICONTEXT\fR
+Optional. Pass error output or additional context from a previous
+.B \-p
+attempt. Claude will analyse the failure and produce an adapted payload.
+Only meaningful with
+.BR \-p .
+.SH ENVIRONMENT
+.TP
+.B ANTHROPIC_API_KEY
+Required when using
+.BR \-p " / " \-\-payload .
+Obtain from console.anthropic.com.
+.SH FILES
+.TP
+.I ~/Tools/hacktricks
+Local clone of the HackTricks knowledge base.
+Clone with:
+.B git clone https://github.com/HackTricks\-wiki/hacktricks ~/Tools/hacktricks
+.TP
+.I ~/Tools/payloadsallthethings
+Local clone of PayloadsAllTheThings.
+Clone with:
+.B git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsallthethings
+.SH EXAMPLES
+Browse matching entries before committing to a payload:
+.PP
+.RS
+.nf
+hacktrix \-f ssti handlebars
+hacktrix \-f lfi php windows iis
+.fi
+.RE
+.PP
+Generate a payload directly:
+.PP
+.RS
+.nf
+hacktrix \-p ssti handlebars groovy rce
+hacktrix \-p sqli union mysql
+hacktrix \-p xss csp bypass reflected
+hacktrix \-p lfi php windows iis read
+.fi
+.RE
+.PP
+Adapt after a failed attempt:
+.PP
+.RS
+.nf
+hacktrix \-p ssti handlebars groovy rce \-d "'require' is not defined"
+hacktrix \-p sqli union mysql \-d "WAF blocking SELECT and UNION keywords"
+hacktrix \-p lfi php \-d "../etc/passwd filtered, server returned 403"
+.fi
+.RE
+.PP
+Typical workflow \(em find first, then payload:
+.PP
+.RS
+.nf
+hacktrix \-f ssti handlebars        # see what sources exist
+hacktrix \-p ssti handlebars nodejs  # generate payload with refined terms
+.fi
+.RE
+.SH NOTES
+All search terms are AND\-matched against file content (case\-insensitive).
+More specific terms return fewer files and produce more focused payloads.
+If
+.B \-p
+returns no results, drop a term and try again.
+.PP
+Each
+.B \-p
+call costs approximately $0.001\(en$0.005 in Claude API credits
+(claude\-sonnet\-4\-6, ~200\(en500 tokens output).
+.SH SEE ALSO
+.BR searchsploit (1),
+.BR msfconsole (1)
+.SH AUTHOR
+Written by jhaxx.
