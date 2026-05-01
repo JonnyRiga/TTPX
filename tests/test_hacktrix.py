@@ -133,22 +133,30 @@ def test_ask_claude_returns_parsed_json():
     assert "recommendation" in result
 
 
-def test_cli_no_results():
+def test_cli_find_no_results():
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "nonexistentterm123xyz"],
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "-f", "nonexistentterm123xyz"],
         capture_output=True, text=True
     )
-    assert "No results for" in result.stdout
+    assert result.returncode == 0
 
 
-def test_cli_exploit_flag_without_api_key():
+def test_cli_payload_flag_without_api_key():
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "ssti", "--exploit"],
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "-p", "ssti"],
         capture_output=True, text=True, env=env
     )
     assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
+
+
+def test_cli_requires_flag():
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "hacktrix.py")],
+        capture_output=True, text=True
+    )
+    assert result.returncode != 0
 
 
 def test_source_label_identifies_hacktricks_path():

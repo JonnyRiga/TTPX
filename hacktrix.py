@@ -199,52 +199,55 @@ def display_find_results(matches, terms):
 def main():
     parser = argparse.ArgumentParser(
         prog="hacktrix",
-        description="Search HackTricks and PayloadsAllTheThings for exploitation techniques"
+        description="Search HackTricks + PayloadsAllTheThings for exploitation techniques"
     )
-    parser.add_argument("terms", nargs="+", help="Search terms (all must match)")
-    parser.add_argument("--exploit", action="store_true",
-                        help="Generate exploit summary and payload via Claude")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-f", "--find", nargs="+", metavar="TERM",
+                       help="Search and display matching entries (no Claude)")
+    group.add_argument("-p", "--payload", nargs="+", metavar="TERM",
+                       help="Search then generate best payload via Claude")
     args = parser.parse_args()
 
-    if args.exploit and not os.environ.get("ANTHROPIC_API_KEY"):
-        print("Set ANTHROPIC_API_KEY to use --exploit")
+    if args.payload and not os.environ.get("ANTHROPIC_API_KEY"):
+        console.print("[red]Set ANTHROPIC_API_KEY to use -p / --payload[/red]")
         sys.exit(1)
 
+    terms = args.find or args.payload
     available = [p for p in [HACKTRICKS_PATH, PATT_PATH] if p.exists()]
     missing = [p for p in [HACKTRICKS_PATH, PATT_PATH] if not p.exists()]
 
     if not available:
-        print(
-            "No sources found. Clone:\n"
+        console.print(
+            "[red]No sources found. Clone:[/red]\n"
             "  git clone https://github.com/HackTricks-wiki/hacktricks ~/Tools/hacktricks\n"
             "  git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsallthethings"
         )
         sys.exit(1)
 
     for p in missing:
-        if p == HACKTRICKS_PATH:
-            print("Warning: HackTricks not found. Searching PayloadsAllTheThings only.")
-        else:
-            print("Warning: PayloadsAllTheThings not found. Searching HackTricks only.")
+        label = "HackTricks" if p == HACKTRICKS_PATH else "PayloadsAllTheThings"
+        console.print(f"[yellow]Warning: {label} not found — skipping.[/yellow]")
 
-    matches = find_matches(args.terms, search_paths=available)
+    if args.find:
+        console.print("[dim]Searching HackTricks + PayloadsAllTheThings...[/dim]")
+        matches = find_matches(terms, search_paths=available)
+        display_find_results(matches, terms)
 
-    if not matches:
-        print(f"No results for: {' '.join(args.terms)}")
-        sys.exit(0)
-
-    print(f"Found {len(matches)} file(s)\n")
-    for path, snippet in matches:
-        print(f"\n{'=' * 60}")
-        print(f"Source: {source_label(path)}")
-        print(f"{'=' * 60}")
-        print(snippet)
-
-    if args.exploit:
-        print(f"\n{'=' * 60}")
-        print("Claude Exploit Analysis")
-        print(f"{'=' * 60}")
-        print(ask_claude(matches, args.terms))
+    elif args.payload:
+        console.print("[dim]Searching HackTricks + PayloadsAllTheThings...[/dim]")
+        matches = find_matches(terms, search_paths=available)
+        if not matches:
+            console.print(f"[yellow]No results for: {' '.join(terms)}[/yellow]")
+            sys.exit(0)
+        console.print("[dim]Sending findings to Claude...[/dim]")
+        data = ask_claude(matches, terms)
+        sources = list(dict.fromkeys(
+            f"[{base.name}] {path.relative_to(base)}"
+            for path, _ in matches
+            for base in [HACKTRICKS_PATH, PATT_PATH]
+            if path.is_relative_to(base)
+        ))
+        display_payload_result(data, sources)
 
 
 if __name__ == "__main__":
