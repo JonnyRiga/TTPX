@@ -228,25 +228,19 @@ def main():
         label = "HackTricks" if p == HACKTRICKS_PATH else "PayloadsAllTheThings"
         console.print(f"[yellow]Warning: {label} not found — skipping.[/yellow]")
 
+    console.print("[dim]Searching HackTricks + PayloadsAllTheThings...[/dim]")
+    matches = find_matches(terms, search_paths=available)
+
     if args.find:
-        console.print("[dim]Searching HackTricks + PayloadsAllTheThings...[/dim]")
-        matches = find_matches(terms, search_paths=available)
         display_find_results(matches, terms)
 
-    elif args.payload:
-        console.print("[dim]Searching HackTricks + PayloadsAllTheThings...[/dim]")
-        matches = find_matches(terms, search_paths=available)
+    else:
         if not matches:
             console.print(f"[yellow]No results for: {' '.join(terms)}[/yellow]")
             sys.exit(0)
         console.print("[dim]Sending findings to Claude...[/dim]")
         data = ask_claude(matches, terms)
-        sources = list(dict.fromkeys(
-            f"[{base.name}] {path.relative_to(base)}"
-            for path, _ in matches
-            for base in [HACKTRICKS_PATH, PATT_PATH]
-            if path.is_relative_to(base)
-        ))
+        sources = list(dict.fromkeys(source_label(path) for path, _ in matches))
         display_payload_result(data, sources)
 
 
