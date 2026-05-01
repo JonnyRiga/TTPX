@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 from rich.syntax import Syntax
 from rich import box
@@ -130,6 +131,7 @@ def ask_claude(matches, terms, details=None):
         "No markdown. No explanation outside the JSON object."
     )
 
+    raw = ""
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
@@ -154,6 +156,14 @@ def ask_claude(matches, terms, details=None):
         return {
             "vulnerability": "API Error",
             "technique": str(e),
+            "language": "text",
+            "payload": "",
+            "recommendation": ""
+        }
+    except (IndexError, AttributeError) as e:
+        return {
+            "vulnerability": "Parse Error",
+            "technique": f"Unexpected API response structure: {e}",
             "language": "text",
             "payload": "",
             "recommendation": ""
@@ -184,7 +194,7 @@ def display_payload_result(data, sources):
     console.print(Text("★ " + data["recommendation"], style="bold yellow"))
     console.print()
     source_str = "  ".join(sources)
-    console.print(f"[dim]Source: {source_str}[/dim]")
+    console.print(f"[dim]Source: {escape(source_str)}[/dim]")
     console.rule()
 
 
@@ -227,6 +237,9 @@ def main():
     parser.add_argument("-d", "--details", metavar="CONTEXT",
                         help="Error or context from a previous attempt (use with -p)")
     args = parser.parse_args()
+
+    if args.details and args.find:
+        console.print("[yellow]Warning: -d/--details has no effect with -f/--find[/yellow]")
 
     if args.payload and not os.environ.get("ANTHROPIC_API_KEY"):
         console.print("[red]Set ANTHROPIC_API_KEY to use -p / --payload[/red]")

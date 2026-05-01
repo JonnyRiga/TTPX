@@ -131,6 +131,36 @@ def test_ask_claude_returns_parsed_json():
     assert result["language"] == "javascript"
     assert "payload" in result
     assert "recommendation" in result
+    call_kwargs = mock_client.messages.create.call_args[1]
+    assert call_kwargs["model"] == "claude-sonnet-4-6"
+
+
+def test_ask_claude_includes_details_in_prompt():
+    import json
+    matches = [
+        (Path("/fake/ssti.md"), "## Handlebars SSTI\n{{7*7}} = 49\nRCE via: ...")
+    ]
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=json.dumps({
+        "vulnerability": "SSTI via Handlebars (Node.js)",
+        "technique": "RCE via prototype chain escape",
+        "language": "javascript",
+        "payload": "{{#with 'x'}}...{{/with}}",
+        "recommendation": "Adapted after require error."
+    }))]
+
+    with patch("anthropic.Anthropic") as mock_client_cls:
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+
+        result = ask_claude(matches, ["handlebars", "rce"], details="'require' is not defined")
+
+    call_kwargs = mock_client.messages.create.call_args[1]
+    prompt = call_kwargs["messages"][0]["content"]
+    assert "'require' is not defined" in prompt
+    assert "adapt" in prompt.lower()
+    assert result["language"] == "javascript"
 
 
 def test_cli_find_no_results():
