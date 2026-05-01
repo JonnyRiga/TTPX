@@ -83,30 +83,53 @@ def find_matches(terms, search_paths=None):
 
 def ask_claude(matches, terms):
     import anthropic
+    import json as _json
     client = anthropic.Anthropic()
 
     context = "\n\n---\n\n".join(
         f"Source: {source_label(path)}\n\n{snippet}" for path, snippet in matches
     )
 
+    prompt = (
+        f"You are a penetration tester. Based on these HackTricks and PayloadsAllTheThings "
+        f"sections about {' '.join(terms)}:\n\n"
+        f"{context}\n\n"
+        "Select the single most impactful payload for these terms. "
+        "Return ONLY a JSON object with these exact keys:\n"
+        '  "vulnerability": short name of the vulnerability and target (e.g. "SSTI via Handlebars (Node.js)")\n'
+        '  "technique": one sentence on how the exploit works\n'
+        '  "language": the payload language as a pygments lexer name — one of: javascript, php, groovy, bash, python, java, text\n'
+        '  "payload": the raw payload string, no markdown fences\n'
+        '  "recommendation": one sentence explaining why this payload is the most impactful choice\n'
+        "No markdown. No explanation outside the JSON object."
+    )
+
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2048,
-            messages=[{
-                "role": "user",
-                "content": (
-                    f"Based on these HackTricks and PayloadsAllTheThings sections about {' '.join(terms)}:\n\n"
-                    f"{context}\n\n"
-                    "Provide:\n"
-                    "1. Technique summary — what this vulnerability is and how it works\n"
-                    "2. Ready-to-use payload or command to exploit it"
-                )
-            }]
+            messages=[{"role": "user", "content": prompt}]
         )
-        return response.content[0].text
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = "\n".join(raw.split("\n")[1:-1])
+        return _json.loads(raw)
+    except _json.JSONDecodeError:
+        return {
+            "vulnerability": "Unknown",
+            "technique": "Claude returned malformed JSON",
+            "language": "text",
+            "payload": response.content[0].text,
+            "recommendation": "Raw Claude output shown above."
+        }
     except anthropic.APIError as e:
-        return f"Claude API error: {e}"
+        return {
+            "vulnerability": "API Error",
+            "technique": str(e),
+            "language": "text",
+            "payload": "",
+            "recommendation": ""
+        }
 
 
 def main():

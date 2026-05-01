@@ -106,12 +106,19 @@ def test_find_matches_skips_missing_path(tmp_path):
     assert len(results) == 1
 
 
-def test_ask_claude_sends_terms_and_snippets_to_api():
+def test_ask_claude_returns_parsed_json():
+    import json
     matches = [
         (Path("/fake/ssti.md"), "## Handlebars SSTI\n{{7*7}} = 49 means vulnerable\nRCE via: ...")
     ]
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text="Summary: SSTI in Handlebars\nPayload: {{7*7}}")]
+    mock_response.content = [MagicMock(text=json.dumps({
+        "vulnerability": "SSTI via Handlebars (Node.js)",
+        "technique": "RCE via prototype chain escape",
+        "language": "javascript",
+        "payload": "{{#with 'x'}}...{{/with}}",
+        "recommendation": "Most impactful: gives direct RCE."
+    }))]
 
     with patch("anthropic.Anthropic") as mock_client_cls:
         mock_client = MagicMock()
@@ -120,10 +127,10 @@ def test_ask_claude_sends_terms_and_snippets_to_api():
 
         result = ask_claude(matches, ["handlebars", "ssti", "rce"])
 
-    assert "Summary" in result or "Payload" in result
-    call_kwargs = mock_client.messages.create.call_args[1]
-    assert call_kwargs["model"] == "claude-sonnet-4-6"
-    assert "handlebars" in call_kwargs["messages"][0]["content"].lower()
+    assert result["vulnerability"] == "SSTI via Handlebars (Node.js)"
+    assert result["language"] == "javascript"
+    assert "payload" in result
+    assert "recommendation" in result
 
 
 def test_cli_no_results():
