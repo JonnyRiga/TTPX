@@ -59,7 +59,7 @@ def ask_claude(matches, terms):
     client = anthropic.Anthropic()
 
     context = "\n\n---\n\n".join(
-        f"Source: {path}\n\n{snippet}" for path, snippet in matches
+        f"Source: {source_label(path)}\n\n{snippet}" for path, snippet in matches
     )
 
     try:
