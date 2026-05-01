@@ -9,7 +9,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.syntax import Syntax
 from rich import box
-from rich.rule import Rule
 from rich.text import Text
 
 console = Console()
@@ -171,23 +170,27 @@ def display_payload_result(data, sources):
     console.rule()
 
 
-def display_find_results(matches):
+def display_find_results(matches, terms):
     if not matches:
         console.print("[yellow]No results found.[/yellow]")
         return
 
     table = Table(box=box.SIMPLE_HEAD, show_header=True, header_style="bold cyan")
-    table.add_column("Source", style="green", no_wrap=True, min_width=16)
+    table.add_column("Source", style="green", no_wrap=True, min_width=14)
     table.add_column("Title", style="white", min_width=30)
     table.add_column("Path", style="dim")
 
     for path, snippet in matches:
-        label = source_label(path)
-        lines = path.read_text(errors="ignore").splitlines()
-        title = extract_title(lines, [], fallback=path)
-        base = HACKTRICKS_PATH if HACKTRICKS_PATH in path.parents else PATT_PATH
-        rel = str(path.relative_to(base))
-        table.add_row(label, title, rel)
+        title = extract_title(snippet.splitlines(), terms, fallback=path)
+        for base in [HACKTRICKS_PATH, PATT_PATH]:
+            if path.is_relative_to(base):
+                src = f"[{base.name}]"
+                rel = str(path.relative_to(base))
+                break
+        else:
+            src = "[unknown]"
+            rel = str(path)
+        table.add_row(src, title, rel)
 
     console.print(table)
     console.print(f"[dim]{len(matches)} result(s)[/dim]")
