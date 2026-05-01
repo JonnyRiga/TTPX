@@ -69,7 +69,7 @@ def ask_claude(matches, terms):
             messages=[{
                 "role": "user",
                 "content": (
-                    f"Based on these HackTricks sections about {' '.join(terms)}:\n\n"
+                    f"Based on these HackTricks and PayloadsAllTheThings sections about {' '.join(terms)}:\n\n"
                     f"{context}\n\n"
                     "Provide:\n"
                     "1. Technique summary — what this vulnerability is and how it works\n"
@@ -85,7 +85,7 @@ def ask_claude(matches, terms):
 def main():
     parser = argparse.ArgumentParser(
         prog="hacktrix",
-        description="Search HackTricks for exploitation techniques"
+        description="Search HackTricks and PayloadsAllTheThings for exploitation techniques"
     )
     parser.add_argument("terms", nargs="+", help="Search terms (all must match)")
     parser.add_argument("--exploit", action="store_true",
@@ -96,14 +96,24 @@ def main():
         print("Set ANTHROPIC_API_KEY to use --exploit")
         sys.exit(1)
 
-    if not HACKTRICKS_PATH.exists():
+    available = [p for p in [HACKTRICKS_PATH, PATT_PATH] if p.exists()]
+    missing = [p for p in [HACKTRICKS_PATH, PATT_PATH] if not p.exists()]
+
+    if not available:
         print(
-            "HackTricks not found. Run: "
-            "git clone https://github.com/HackTricks-wiki/hacktricks ~/Tools/hacktricks"
+            "No sources found. Clone:\n"
+            "  git clone https://github.com/HackTricks-wiki/hacktricks ~/Tools/hacktricks\n"
+            "  git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsallthethings"
         )
         sys.exit(1)
 
-    matches = find_matches(args.terms)
+    for p in missing:
+        if p == HACKTRICKS_PATH:
+            print("Warning: HackTricks not found. Searching PayloadsAllTheThings only.")
+        else:
+            print("Warning: PayloadsAllTheThings not found. Searching HackTricks only.")
+
+    matches = find_matches(args.terms, search_paths=available)
 
     if not matches:
         print(f"No results for: {' '.join(args.terms)}")
@@ -112,7 +122,7 @@ def main():
     print(f"Found {len(matches)} file(s)\n")
     for path, snippet in matches:
         print(f"\n{'=' * 60}")
-        print(f"Source: {path.relative_to(HACKTRICKS_PATH)}")
+        print(f"Source: {source_label(path)}")
         print(f"{'=' * 60}")
         print(snippet)
 
