@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -83,7 +84,6 @@ def find_matches(terms, search_paths=None):
 
 def ask_claude(matches, terms):
     import anthropic
-    import json as _json
     client = anthropic.Anthropic()
 
     context = "\n\n---\n\n".join(
@@ -111,15 +111,17 @@ def ask_claude(matches, terms):
             messages=[{"role": "user", "content": prompt}]
         )
         raw = response.content[0].text.strip()
-        if raw.startswith("```"):
-            raw = "\n".join(raw.split("\n")[1:-1])
-        return _json.loads(raw)
-    except _json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start != -1 and end > start:
+            raw = raw[start:end]
+        return json.loads(raw)
+    except json.JSONDecodeError:
         return {
             "vulnerability": "Unknown",
             "technique": "Claude returned malformed JSON",
             "language": "text",
-            "payload": response.content[0].text,
+            "payload": raw,
             "recommendation": "Raw Claude output shown above."
         }
     except anthropic.APIError as e:
