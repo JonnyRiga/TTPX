@@ -5,6 +5,15 @@ import os
 import sys
 from pathlib import Path
 
+from rich.console import Console
+from rich.table import Table
+from rich.syntax import Syntax
+from rich import box
+from rich.rule import Rule
+from rich.text import Text
+
+console = Console()
+
 HACKTRICKS_PATH = Path.home() / "Tools" / "hacktricks"
 PATT_PATH = Path.home() / "Tools" / "payloadsallthethings"
 
@@ -132,6 +141,56 @@ def ask_claude(matches, terms):
             "payload": "",
             "recommendation": ""
         }
+
+
+LANGUAGE_LABELS = {
+    "javascript": "JavaScript",
+    "php": "PHP",
+    "groovy": "Groovy",
+    "bash": "Bash",
+    "python": "Python",
+    "java": "Java",
+    "text": "Text",
+}
+
+
+def display_payload_result(data, sources):
+    lang = data.get("language", "text")
+    label = LANGUAGE_LABELS.get(lang, lang.capitalize())
+
+    console.print()
+    console.rule(f"[bold red]{data['vulnerability']}[/bold red]")
+    console.print(f"[bold]Technique:[/bold] {data['technique']}\n")
+    console.print(f"[bold cyan]Payload[/bold cyan] [dim]({label})[/dim]")
+    console.print(Syntax(data["payload"], lang, theme="monokai", line_numbers=False, padding=(1, 2)))
+    console.print()
+    console.print(Text("★ " + data["recommendation"], style="bold yellow"))
+    console.print()
+    source_str = "  ".join(sources)
+    console.print(f"[dim]Source: {source_str}[/dim]")
+    console.rule()
+
+
+def display_find_results(matches):
+    if not matches:
+        console.print("[yellow]No results found.[/yellow]")
+        return
+
+    table = Table(box=box.SIMPLE_HEAD, show_header=True, header_style="bold cyan")
+    table.add_column("Source", style="green", no_wrap=True, min_width=16)
+    table.add_column("Title", style="white", min_width=30)
+    table.add_column("Path", style="dim")
+
+    for path, snippet in matches:
+        label = source_label(path)
+        lines = path.read_text(errors="ignore").splitlines()
+        title = extract_title(lines, [], fallback=path)
+        base = HACKTRICKS_PATH if HACKTRICKS_PATH in path.parents else PATT_PATH
+        rel = str(path.relative_to(base))
+        table.add_row(label, title, rel)
+
+    console.print(table)
+    console.print(f"[dim]{len(matches)} result(s)[/dim]")
 
 
 def main():
