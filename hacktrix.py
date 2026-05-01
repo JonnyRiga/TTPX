@@ -99,7 +99,7 @@ def find_matches(terms, search_paths=None):
     return matches
 
 
-def ask_claude(matches, terms):
+def ask_claude(matches, terms, details=None):
     import anthropic
     client = anthropic.Anthropic()
 
@@ -107,11 +107,20 @@ def ask_claude(matches, terms):
         f"Source: {source_label(path)}\n\n{snippet}" for path, snippet in matches
     )
 
+    if details:
+        task = (
+            f"A previous payload attempt produced the following result:\n\n"
+            f"{details}\n\n"
+            "Analyse the error, adapt your approach, and provide a corrected payload."
+        )
+    else:
+        task = "Select the single most impactful payload for these terms."
+
     prompt = (
         f"You are a penetration tester. Based on these HackTricks and PayloadsAllTheThings "
         f"sections about {' '.join(terms)}:\n\n"
         f"{context}\n\n"
-        "Select the single most impactful payload for these terms. "
+        f"{task} "
         "Return ONLY a JSON object with these exact keys:\n"
         '  "vulnerability": short name of the vulnerability and target (e.g. "SSTI via Handlebars (Node.js)")\n'
         '  "technique": one sentence on how the exploit works\n'
@@ -215,6 +224,8 @@ def main():
                        help="Search and display matching entries (no Claude)")
     group.add_argument("-p", "--payload", nargs="+", metavar="TERM",
                        help="Search then generate best payload via Claude")
+    parser.add_argument("-d", "--details", metavar="CONTEXT",
+                        help="Error or context from a previous attempt (use with -p)")
     args = parser.parse_args()
 
     if args.payload and not os.environ.get("ANTHROPIC_API_KEY"):
@@ -248,7 +259,7 @@ def main():
             console.print(f"[yellow]No results for: {' '.join(terms)}[/yellow]")
             sys.exit(0)
         console.print("[dim]Sending findings to Claude...[/dim]")
-        data = ask_claude(matches, terms)
+        data = ask_claude(matches, terms, details=args.details)
         sources = list(dict.fromkeys(source_label(path) for path, _ in matches))
         display_payload_result(data, sources)
 
