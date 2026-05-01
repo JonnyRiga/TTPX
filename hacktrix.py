@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -224,6 +225,50 @@ def display_find_results(matches, terms):
     console.print(f"[dim]{len(matches)} result(s)[/dim]")
 
 
+def strip_markdown(text):
+    # code fences — keep content, drop fence lines
+    text = re.sub(r"```[^\n]*\n", "", text)
+    text = re.sub(r"```", "", text)
+    # headings — keep text, drop # symbols
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    # bold / italic
+    text = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", text)
+    text = re.sub(r"_{1,3}(.+?)_{1,3}", r"\1", text)
+    # inline code — keep content
+    text = re.sub(r"`(.+?)`", r"\1", text)
+    # links — keep display text
+    text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
+    # images
+    text = re.sub(r"!\[[^\]]*\]\([^\)]+\)", "", text)
+    # blockquotes
+    text = re.sub(r"^>\s?", "", text, flags=re.MULTILINE)
+    # horizontal rules
+    text = re.sub(r"^[-*_]{3,}\s*$", "", text, flags=re.MULTILINE)
+    # collapse 3+ blank lines to 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+def mirror_file(rel_path):
+    target = None
+    for base in [HACKTRICKS_PATH, PATT_PATH]:
+        candidate = base / rel_path
+        if candidate.exists():
+            target = candidate
+            break
+
+    if target is None:
+        console.print(f"[red]File not found in any source:[/red] {rel_path}")
+        console.print("  Check the path matches a -f result exactly.")
+        sys.exit(1)
+
+    content = target.read_text(errors="ignore")
+    plain = strip_markdown(content)
+    out = Path.cwd() / (target.stem + ".txt")
+    out.write_text(plain)
+    console.print(f"[green]Mirrored:[/green] {out.name}  [dim]({len(plain.splitlines())} lines)[/dim]")
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="hacktrix",
@@ -253,9 +298,15 @@ def main():
                        help="search both sources and display a table of matching entries (no Claude, no API cost)")
     group.add_argument("-p", "--payload", nargs="+", metavar="TERM",
                        help="search both sources then send findings to Claude for a syntax-highlighted, ready-to-use payload")
+    group.add_argument("-m", "--mirror", metavar="PATH",
+                       help="copy a file from a -f result to cwd as plain text, stripping markdown (alias: htm)")
     parser.add_argument("-d", "--details", metavar="CONTEXT",
                         help="error output or context from a previous -p attempt; Claude will analyse and adapt the payload")
     args = parser.parse_args()
+
+    if args.mirror:
+        mirror_file(args.mirror)
+        sys.exit(0)
 
     if args.details and args.find:
         console.print("[yellow]Warning: -d/--details has no effect with -f/--find[/yellow]")
