@@ -5,6 +5,14 @@ import sys
 from pathlib import Path
 
 HACKTRICKS_PATH = Path.home() / "Tools" / "hacktricks"
+PATT_PATH = Path.home() / "Tools" / "payloadsallthethings"
+
+
+def source_label(path):
+    for base in [HACKTRICKS_PATH, PATT_PATH]:
+        if path.is_relative_to(base):
+            return f"[{base.name}] {path.relative_to(base)}"
+    return str(path)
 
 
 def extract_snippet(lines, terms, context=20):

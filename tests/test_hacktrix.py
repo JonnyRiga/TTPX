@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, find_matches, ask_claude
+from hacktrix import extract_snippet, find_matches, ask_claude, source_label, HACKTRICKS_PATH, PATT_PATH
 from unittest.mock import patch, MagicMock
 
 
@@ -122,3 +122,18 @@ def test_cli_exploit_flag_without_api_key():
         capture_output=True, text=True, env=env
     )
     assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
+
+
+def test_source_label_identifies_hacktricks_path():
+    path = HACKTRICKS_PATH / "web" / "ssti.md"
+    assert source_label(path) == "[hacktricks] web/ssti.md"
+
+
+def test_source_label_identifies_patt_path():
+    path = PATT_PATH / "SSTI" / "README.md"
+    assert source_label(path) == "[payloadsallthethings] SSTI/README.md"
+
+
+def test_source_label_falls_back_to_str_for_unknown_path():
+    path = Path("/tmp/unknown.md")
+    assert source_label(path) == "/tmp/unknown.md"
