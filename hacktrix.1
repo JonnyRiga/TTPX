@@ -19,6 +19,14 @@ hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniqu
 .B \-d
 .I CONTEXT
 ]
+.br
+.B hacktrix
+.B \-m
+.I PATH
+[
+.B \-s
+.I TERM
+]
 .SH DESCRIPTION
 .B hacktrix
 searches local clones of HackTricks and PayloadsAllTheThings (PATT) for
@@ -34,6 +42,13 @@ syntax\-highlighted, ready\-to\-use payload with a recommendation.
 Feed back errors or context with
 .B \-d
 to get an adapted payload on the next attempt.
+Use
+.B \-m
+to copy a file from a
+.B \-f
+result to the current directory as plain text with markdown stripped.
+Optionally scope the output to a specific section with
+.BR \-s .
 .SH OPTIONS
 .TP
 .BR \-f ", " \-\-find " " \fITERM\fR " [" \fITERM\fR ...]"
@@ -48,6 +63,22 @@ payload, syntax\-highlights it by language (JavaScript, PHP, Groovy,
 Bash, Python, Java), and provides a one\-line recommendation.
 Requires
 .BR ANTHROPIC_API_KEY .
+.TP
+.BR \-m ", " \-\-mirror " " \fIPATH\fR
+Copy a file to the current directory as plain text with markdown stripped.
+.I PATH
+is the relative path exactly as shown in a
+.B \-f
+result. Paths with spaces must be quoted. Shell alias:
+.BR htm .
+.TP
+.BR \-s ", " \-\-section " " \fITERM\fR
+Optional. Use with
+.B \-m
+to extract only the section whose heading contains
+.IR TERM .
+Extracts from the matched heading down to the next heading of equal or
+higher level. Falls back to the full file if no matching heading is found.
 .TP
 .BR \-d ", " \-\-details " " \fICONTEXT\fR
 Optional. Pass error output or additional context from a previous
@@ -103,12 +134,30 @@ hacktrix \-p lfi php \-d "../etc/passwd filtered, server returned 403"
 .fi
 .RE
 .PP
-Typical workflow \(em find first, then payload:
+Mirror a file from a \-f result (full file):
 .PP
 .RS
 .nf
-hacktrix \-f ssti handlebars        # see what sources exist
-hacktrix \-p ssti handlebars nodejs  # generate payload with refined terms
+htm "Server Side Template Injection/JavaScript.md"
+.fi
+.RE
+.PP
+Mirror a specific section only:
+.PP
+.RS
+.nf
+htm "Server Side Template Injection/JavaScript.md" \-s handlebars
+htm "File Inclusion/README.md" \-s php
+.fi
+.RE
+.PP
+Typical workflow:
+.PP
+.RS
+.nf
+hacktrix \-f ssti handlebars        # see what files match
+htm "Server Side Template Injection/JavaScript.md" \-s handlebars  # grab the section
+hacktrix \-p ssti handlebars groovy  # generate a payload
 .fi
 .RE
 .SH NOTES

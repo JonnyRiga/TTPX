@@ -1,6 +1,6 @@
 # hacktrix
 
-Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques. Get a clean searchsploit-style table with `-f`, or send the findings straight to Claude for a syntax-highlighted, ready-to-use payload with `-p`.
+Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques. Get a clean searchsploit-style table with `-f`, send the findings to Claude for a syntax-highlighted payload with `-p`, or grab a file to your cwd as plain text with `-m` (`htm`).
 
 ## Install
 
@@ -35,11 +35,12 @@ echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc && source ~/.zshrc
 ```
 hacktrix -f TERM [TERM ...]
 hacktrix -p TERM [TERM ...] [-d CONTEXT]
+hacktrix -m PATH [-s TERM]
 ```
 
 ### `-f` / `--find` — browse (no Claude, no cost)
 
-Search both sources and display a clean table. Use this to see what content exists before generating a payload.
+Search both sources and display a clean table. Use this to see what content exists before generating a payload or grabbing a file.
 
 ```bash
 hacktrix -f ssti handlebars
@@ -98,21 +99,38 @@ hacktrix -p sqli union mysql -d "WAF blocking SELECT and UNION keywords"
 hacktrix -p lfi php -d "../etc/passwd filtered, server returned 403"
 ```
 
+### `-m` / `--mirror` — grab a file to cwd (alias: `htm`)
+
+Copy a file from a `-f` result to the current directory as plain text with markdown stripped. Path must match the `-f` output exactly — quote paths with spaces.
+
+```bash
+htm "Server Side Template Injection/JavaScript.md"          # full file
+htm "Server Side Template Injection/JavaScript.md" -s handlebars  # section only
+```
+
+Use `-s` / `--section` to extract just the section whose heading matches the term, stopping at the next heading of equal or higher level. Falls back to the full file if the section isn't found.
+
+```bash
+htm "File Inclusion/README.md" -s lfi
+htm "SQL Injection/README.md" -s mysql
+```
+
 ---
 
 ## Workflow
-
-The intended pattern — find first, then payload:
 
 ```bash
 # 1. See what content exists
 hacktrix -f ssti handlebars
 
-# 2. Refine terms based on what you see, generate payload
-hacktrix -p ssti handlebars nodejs rce
+# 2. Grab the relevant section to read offline
+htm "Server Side Template Injection/JavaScript.md" -s handlebars
 
-# 3. Hit an error? Feed it back
-hacktrix -p ssti handlebars nodejs rce -d "sandbox active, require not available"
+# 3. Generate a payload
+hacktrix -p ssti handlebars groovy rce
+
+# 4. Hit an error? Feed it back
+hacktrix -p ssti handlebars groovy rce -d "sandbox active, require not available"
 ```
 
 More specific terms = fewer matched files = more focused payload + lower API cost.
@@ -122,7 +140,7 @@ If `-p` returns no results, drop a term.
 
 ## Cost
 
-Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `-f` is free.
+Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `-f` and `-m` are free.
 
 ---
 
