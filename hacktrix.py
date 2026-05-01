@@ -161,7 +161,7 @@ def display_payload_result(data, sources):
     console.rule(f"[bold red]{data['vulnerability']}[/bold red]")
     console.print(f"[bold]Technique:[/bold] {data['technique']}\n")
     console.print(f"[bold cyan]Payload[/bold cyan] [dim]({label})[/dim]")
-    console.print(Syntax(data["payload"], lang, theme="monokai", line_numbers=False, padding=(1, 2)))
+    console.print(Syntax(data["payload"], lang, theme="monokai", line_numbers=False, padding=(1, 2), word_wrap=True))
     console.print()
     console.print(Text("★ " + data["recommendation"], style="bold yellow"))
     console.print()
