@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, HACKTRICKS_PATH, PATT_PATH
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, mirror_file, HACKTRICKS_PATH, PATT_PATH
 from unittest.mock import patch, MagicMock
 
 
@@ -235,3 +235,53 @@ def test_extract_title_returns_unknown_when_no_terms_and_no_fallback():
     lines = ["## Some Heading", "some content"]
     result = extract_title(lines, [])
     assert result == "Unknown"
+
+
+def test_strip_markdown_preserves_dunder_names():
+    payload = '{{config.__class__.__init__.__globals__["os"].popen("id").read()}}'
+    assert strip_markdown(payload) == payload
+
+
+def test_strip_markdown_preserves_glob_asterisks():
+    assert "*.php" in strip_markdown("find / -name '*.php'")
+    assert "rm *" in strip_markdown("rm *")
+
+
+def test_strip_markdown_removes_images_cleanly():
+    result = strip_markdown("before\n![alt](http://example.com/img.png)\nafter")
+    assert "!" not in result
+    assert "before" in result
+    assert "after" in result
+
+
+def test_strip_markdown_strips_headings():
+    result = strip_markdown("## Handlebars - RCE\nsome content")
+    assert "##" not in result
+    assert "Handlebars - RCE" in result
+
+
+def test_strip_markdown_preserves_code_fence_content():
+    result = strip_markdown("```javascript\n{{7*7}}\n```")
+    assert "{{7*7}}" in result
+
+
+def test_mirror_file_rejects_path_traversal(tmp_path):
+    import hacktrix
+    original_ht = hacktrix.HACKTRICKS_PATH
+    original_patt = hacktrix.PATT_PATH
+    hacktrix.HACKTRICKS_PATH = tmp_path / "hacktricks"
+    hacktrix.PATT_PATH = tmp_path / "patt"
+    hacktrix.HACKTRICKS_PATH.mkdir()
+    hacktrix.PATT_PATH.mkdir()
+    sensitive = tmp_path / "secret.md"
+    sensitive.write_text("secret content")
+    try:
+        result = subprocess.run(
+            ["python", str(Path.home() / "Tools" / "hacktrix.py"), "-m", "../secret.md"],
+            capture_output=True, text=True
+        )
+        assert "secret content" not in result.stdout
+        assert result.returncode != 0
+    finally:
+        hacktrix.HACKTRICKS_PATH = original_ht
+        hacktrix.PATT_PATH = original_patt

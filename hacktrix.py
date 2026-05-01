@@ -229,17 +229,21 @@ def strip_markdown(text):
     # code fences — keep content, drop fence lines
     text = re.sub(r"```[^\n]*\n", "", text)
     text = re.sub(r"```", "", text)
-    # headings — keep text, drop # symbols
-    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    # bold / italic
-    text = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"\1", text)
-    text = re.sub(r"_{1,3}(.+?)_{1,3}", r"\1", text)
-    # inline code — keep content
-    text = re.sub(r"`(.+?)`", r"\1", text)
+    # images — must run before links to avoid leaving a bare '!' artifact
+    text = re.sub(r"!\[[^\]]*\]\([^\)]+\)", "", text)
     # links — keep display text
     text = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", text)
-    # images
-    text = re.sub(r"!\[[^\]]*\]\([^\)]+\)", "", text)
+    # headings — keep text, drop # symbols
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    # bold/italic with asterisks only — skip underscore variants to preserve
+    # __dunder__ names in Python payloads and shell glob patterns like *.php
+    text = re.sub(r"(?<!\*)\*\*\*(?!\s)(.+?)(?<!\s)\*\*\*(?!\*)", r"\1", text)
+    text = re.sub(r"(?<!\*)\*\*(?!\s)(.+?)(?<!\s)\*\*(?!\*)", r"\1", text)
+    text = re.sub(r"(?<!\*)\*(?!\s)([^\*\n]+?)(?<!\s)\*(?!\*)", r"\1", text)
+    # strikethrough
+    text = re.sub(r"~~(.+?)~~", r"\1", text)
+    # inline code — keep content
+    text = re.sub(r"`(.+?)`", r"\1", text)
     # blockquotes
     text = re.sub(r"^>\s?", "", text, flags=re.MULTILINE)
     # horizontal rules
@@ -253,6 +257,10 @@ def mirror_file(rel_path):
     target = None
     for base in [HACKTRICKS_PATH, PATT_PATH]:
         candidate = base / rel_path
+        try:
+            candidate.resolve().relative_to(base.resolve())
+        except ValueError:
+            continue
         if candidate.exists():
             target = candidate
             break
