@@ -184,11 +184,11 @@ def display_find_results(matches, terms):
         title = extract_title(snippet.splitlines(), terms, fallback=path)
         for base in [HACKTRICKS_PATH, PATT_PATH]:
             if path.is_relative_to(base):
-                src = f"[{base.name}]"
+                src = f"\\[{base.name}]"
                 rel = str(path.relative_to(base))
                 break
         else:
-            src = "[unknown]"
+            src = "\\[unknown]"
             rel = str(path)
         table.add_row(src, title, rel)
 
