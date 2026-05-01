@@ -55,8 +55,17 @@ _TITLE_MAX_LEN = 45
 
 
 def extract_title(lines, terms, fallback: "Path | None" = None):
-    match_idx = _find_match_idx(lines, terms)
+    # Prefer a heading line that itself contains a term (most specific match)
+    if terms:
+        for line in lines:
+            if line.startswith("#") and any(term.lower() in line.lower() for term in terms):
+                title = line.lstrip("#").strip()
+                if len(title) > _TITLE_MAX_LEN:
+                    title = title[:_TITLE_MAX_LEN - 3] + "..."
+                return title
 
+    # Fall back to nearest heading above first text match
+    match_idx = _find_match_idx(lines, terms)
     if match_idx is not None:
         heading_idx = _find_heading_idx(lines, match_idx)
         heading_line = lines[heading_idx]
@@ -181,7 +190,7 @@ def display_find_results(matches, terms):
     table.add_column("Path", style="dim")
 
     for path, snippet in matches:
-        title = extract_title(snippet.splitlines(), terms, fallback=path)
+        title = extract_title(path.read_text(errors="ignore").splitlines(), terms, fallback=path)
         for base in [HACKTRICKS_PATH, PATT_PATH]:
             if path.is_relative_to(base):
                 src = f"\\[{base.name}]"
