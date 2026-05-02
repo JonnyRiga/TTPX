@@ -1,4 +1,4 @@
-# hacktrix
+# Hacktrix
 
 Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques. Get a clean searchsploit-style table with `-f`, send the findings to Claude for a syntax-highlighted payload with `-p`, or grab a file to your cwd as plain text with `-m` (`htm`).
 
