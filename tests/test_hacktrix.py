@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES
 from unittest.mock import patch, MagicMock
 
 
@@ -437,6 +437,49 @@ def test_recently_changed_dirs_ignores_blank_lines(tmp_path, monkeypatch):
     dirs = hacktrix._recently_changed_dirs(tmp_path, 7)
     assert "SQL Injection" in dirs
     assert "" not in dirs
+
+
+def test_recently_changed_dirs_handles_src_prefix(tmp_path, monkeypatch):
+    import hacktrix
+    # Simulate HackTricks GitBook layout: content under src/
+    (tmp_path / "src").mkdir()
+    monkeypatch.setattr(hacktrix.subprocess, "run", lambda cmd, **kw: MagicMock(
+        stdout="src/pentesting-web/ssti.md\n\nsrc/network/README.md\n",
+        returncode=0
+    ))
+    dirs = hacktrix._recently_changed_dirs(tmp_path, 7)
+    assert "pentesting-web" in dirs
+    assert "network" in dirs
+    assert "src" not in dirs
+
+
+def test_content_root_returns_src_when_present(tmp_path):
+    (tmp_path / "src").mkdir()
+    assert _content_root(tmp_path) == tmp_path / "src"
+
+
+def test_content_root_returns_base_when_no_src(tmp_path):
+    assert _content_root(tmp_path) == tmp_path
+
+
+def test_list_categories_descends_into_src(tmp_path, monkeypatch):
+    import io
+    import hacktrix
+    from rich.console import Console as RichConsole
+    ht = tmp_path / "hacktricks"
+    src = ht / "src"
+    (src / "pentesting-web").mkdir(parents=True)
+    (src / "network").mkdir(parents=True)
+    (ht / "scripts").mkdir()  # top-level non-content dir; should not appear
+    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    buf = io.StringIO()
+    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    hacktrix.list_categories()
+    output = buf.getvalue()
+    assert "pentesting-web" in output
+    assert "network" in output
+    assert "scripts" not in output
 
 
 def test_list_categories_since_filters_to_recent(tmp_path, monkeypatch):

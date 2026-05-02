@@ -285,6 +285,17 @@ def update_sources():
         sys.exit(1)
 
 
+def _content_root(base_path: Path) -> Path:
+    """Return the directory that contains topic subdirectories.
+
+    HackTricks restructured to a GitBook layout where content lives under src/.
+    """
+    src = base_path / "src"
+    if src.is_dir():
+        return src
+    return base_path
+
+
 def _recently_changed_dirs(base_path: Path, days: int) -> set:
     result = subprocess.run(
         ["git", "-C", str(base_path), "log",
@@ -293,13 +304,15 @@ def _recently_changed_dirs(base_path: Path, days: int) -> set:
     )
     if result.returncode != 0:
         return set()
+    content = _content_root(base_path)
+    prefix = content.relative_to(base_path).parts  # e.g. ('src',) or ()
     dirs = set()
     for line in result.stdout.splitlines():
         line = line.strip()
         if line:
             parts = Path(line).parts
-            if parts:
-                dirs.add(parts[0])
+            if len(parts) > len(prefix) and parts[:len(prefix)] == prefix:
+                dirs.add(parts[len(prefix)])
     return dirs
 
 
@@ -313,8 +326,9 @@ def list_categories(since_days=None):
         if not path.exists():
             continue
         any_found = True
+        content = _content_root(path)
         all_dirs = sorted(
-            d.name for d in path.iterdir()
+            d.name for d in content.iterdir()
             if d.is_dir() and not d.name.startswith(".")
         )
         if since_days is not None:
@@ -332,7 +346,7 @@ def list_categories(since_days=None):
         table.add_column("Category", style="white")
         table.add_column("Files", style="dim", justify="right")
         for d in dirs:
-            file_count = sum(1 for _ in (path / d).rglob("*.md"))
+            file_count = sum(1 for _ in (content / d).rglob("*.md"))
             table.add_row(d, str(file_count))
         console.print(table)
         console.print(footer)
