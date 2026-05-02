@@ -3,6 +3,16 @@
 hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniques
 .SH SYNOPSIS
 .B hacktrix
+.B \-l
+[
+.B \-\-since
+.I N[d]
+]
+.br
+.B hacktrix
+.B \-u
+.br
+.B hacktrix
 .B \-f
 .I TERM
 [
@@ -33,6 +43,12 @@ searches local clones of HackTricks and PayloadsAllTheThings (PATT) for
 exploitation techniques matching all provided search terms.
 .PP
 Use
+.B \-l
+to browse all top\-level categories in both sources without search terms.
+Use
+.B \-u
+to pull the latest commits from both knowledge bases and print a change summary.
+Use
 .B \-f
 to browse matching entries as a clean table (fast, no API cost).
 Use
@@ -51,6 +67,33 @@ Optionally scope the output to a specific section with
 .BR \-s .
 .SH OPTIONS
 .TP
+.BR \-l ", " \-\-list
+List all top\-level directories in both HackTricks and PayloadsAllTheThings.
+No search terms needed. Use this to explore available categories before
+narrowing down with
+.BR \-f .
+Each source prints a footer with its category count.
+Combine with
+.B \-\-since
+to filter to recently updated categories.
+.TP
+.BR \-u ", " \-\-update
+Run
+.B git pull \-\-ff\-only
+on both knowledge bases and print a per\-source change summary (files changed,
+insertions, deletions). Use this to keep payloads current before an engagement.
+.TP
+.BR \-\-since " " \fIN[d]\fR
+Optional. Use with
+.B \-l
+to filter the category list to directories that have had commits in the last
+.I N
+days (e.g.
+.B \-\-since 7d
+or
+.BR \-\-since\ 7 ).
+The footer shows how many categories matched out of the total.
+.TP
 .BR \-f ", " \-\-find " " \fITERM\fR " [" \fITERM\fR ...]"
 Search both sources for files containing all specified terms. Displays a
 table with source tag, matched section title, and relative file path.
@@ -61,6 +104,7 @@ Search both sources for files containing all specified terms, then send
 the matched content to Claude. Claude selects the single most impactful
 payload, syntax\-highlights it by language (JavaScript, PHP, Groovy,
 Bash, Python, Java), and provides a one\-line recommendation.
+A raw copy\-paste block is printed below the highlighted view for safe terminal selection.
 Requires
 .BR ANTHROPIC_API_KEY .
 .TP
@@ -84,8 +128,24 @@ higher level. Falls back to the full file if no matching heading is found.
 Optional. Pass error output or additional context from a previous
 .B \-p
 attempt. Claude will analyse the failure and produce an adapted payload.
+The output includes a
+.B "What changed"
+section listing the specific tokens or lines modified from the previous attempt.
+Repeat
+.B \-d
+to chain multiple error contexts across attempts (e.g.
+.BR "\-d \(dqerr1\(dq \-d \(dqerr2\(dq" ).
 Only meaningful with
 .BR \-p .
+.TP
+.BR \-\-no\-log
+Skip auto\-logging this
+.B \-p
+result to
+.IR ~/Tools/hacktrix-session.log .
+By default every
+.B \-p
+call appends a timestamped entry (terms, vulnerability, first payload line) to that log.
 .SH ENVIRONMENT
 .TP
 .B ANTHROPIC_API_KEY
@@ -104,6 +164,16 @@ Local clone of PayloadsAllTheThings.
 Clone with:
 .B git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsallthethings
 .SH EXAMPLES
+Browse categories (update sources first):
+.PP
+.RS
+.nf
+hacktrix \-u
+hacktrix \-l
+hacktrix \-l \-\-since 7d
+.fi
+.RE
+.PP
 Browse matching entries before committing to a payload:
 .PP
 .RS
@@ -155,9 +225,12 @@ Typical workflow:
 .PP
 .RS
 .nf
-hacktrix \-f ssti handlebars        # see what files match
-htm "Server Side Template Injection/JavaScript.md" \-s handlebars  # grab the section
-hacktrix \-p ssti handlebars groovy  # generate a payload
+hacktrix \-u                                                        # keep sources current
+hacktrix \-l \-\-since 7d                                             # browse recent updates
+hacktrix \-f ssti handlebars                                        # see what files match
+htm "Server Side Template Injection/JavaScript.md" \-s handlebars   # grab the section
+hacktrix \-p ssti handlebars groovy                                  # generate a payload
+hacktrix \-p ssti handlebars groovy \-d "'require' is not defined"    # adapt after error
 .fi
 .RE
 .SH NOTES

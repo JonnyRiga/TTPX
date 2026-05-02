@@ -33,9 +33,45 @@ echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc && source ~/.zshrc
 ## Usage
 
 ```
+hacktrix -l [--since Nd]
+hacktrix -u
 hacktrix -f TERM [TERM ...]
-hacktrix -p TERM [TERM ...] [-d CONTEXT]
+hacktrix -p TERM [TERM ...] [-d CONTEXT [-d CONTEXT ...]] [--no-log]
 hacktrix -m PATH [-s TERM]
+```
+
+### `-l` / `--list` — browse categories (no terms needed)
+
+List every top-level directory in both sources. Use this when you don't yet know what to search for. Add `--since Nd` to filter to categories updated in the last N days — useful right after `-u`.
+
+```bash
+hacktrix -l
+hacktrix -l --since 7d     # categories with commits in the last 7 days
+```
+
+```
+  [hacktricks]                         [payloadsallthethings]
+  ──────────────────────── ──────       ─────────────────────────── ──────
+  Network Services            12        Command Injection                 8
+  Pentesting Web              47        File Inclusion                   11
+  Reversing                    5        Server Side Template Injection    9
+  ...                                  SQL Injection                    14
+47 categories                          31 categories
+```
+
+### `-u` / `--update` — pull latest (keep payloads current)
+
+Run `git pull` on both knowledge bases and show what changed. Run this before an engagement.
+
+```bash
+hacktrix -u
+```
+
+```
+Updating HackTricks...
+HackTricks: updated  12 files changed, 340 insertions(+), 18 deletions(-)
+Updating PayloadsAllTheThings...
+PayloadsAllTheThings: already up to date
 ```
 
 ### `-f` / `--find` — browse (no Claude, no cost)
@@ -81,22 +117,41 @@ Technique: Handlebars allows access to the JS prototype chain...
 Payload (JavaScript)
 
   {{#with "s" as |string|}}
-    ...
+    {{#with "e"}}
+      {{#with split as |conslist|}}
+        ...
+      {{/with}}
+    {{/with}}
   {{/with}}
+
+── copy-paste ──
+{{#with "s" as |string|}}
+  ...
+{{/with}}
 
 ★ Most impactful: gives direct RCE via constructor chain traversal.
 
 Source: [hacktricks] src/pentesting-web/ssti/README.md
 ```
 
+The syntax-highlighted block is for reading; the `── copy-paste ──` block below it is the raw payload with no terminal formatting — safe to select and paste directly.
+
 ### `-d` / `--details` — adapt after a failed attempt
 
-Feed back an error or context from a previous `-p` attempt. Claude analyses the failure and produces a corrected payload.
+Feed back an error or context from a previous `-p` attempt. Claude analyses the failure, produces a corrected payload, and adds a **What changed** section showing exactly which tokens or lines were modified from the previous attempt. Repeat `-d` to chain multiple error contexts across attempts.
 
 ```bash
 hacktrix -p ssti handlebars groovy rce -d "'require' is not defined"
 hacktrix -p sqli union mysql -d "WAF blocking SELECT and UNION keywords"
-hacktrix -p lfi php -d "../etc/passwd filtered, server returned 403"
+hacktrix -p lfi php -d "../etc/passwd filtered, got 403" -d "double-encoded also blocked"
+```
+
+### `--no-log` — skip session logging
+
+Every `-p` call appends a timestamped entry (terms, vulnerability, first payload line) to `~/Tools/hacktrix-session.log`. Pass `--no-log` to suppress it for a specific call.
+
+```bash
+hacktrix -p xss reflected --no-log
 ```
 
 ### `-m` / `--mirror` — grab a file to cwd (alias: `htm`)
@@ -120,16 +175,22 @@ htm "SQL Injection/README.md" -s mysql
 ## Workflow
 
 ```bash
-# 1. See what content exists
+# 0. Keep sources current before an engagement
+hacktrix -u
+
+# 1. Don't know what to search? Browse categories first
+hacktrix -l
+
+# 2. See what content exists
 hacktrix -f ssti handlebars
 
-# 2. Grab the relevant section to read offline
+# 3. Grab the relevant section to read offline
 htm "Server Side Template Injection/JavaScript.md" -s handlebars
 
-# 3. Generate a payload
+# 4. Generate a payload
 hacktrix -p ssti handlebars groovy rce
 
-# 4. Hit an error? Feed it back
+# 5. Hit an error? Feed it back
 hacktrix -p ssti handlebars groovy rce -d "sandbox active, require not available"
 ```
 
