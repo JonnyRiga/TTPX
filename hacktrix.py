@@ -145,27 +145,31 @@ def ask_claude(matches, terms, details=None):
             "Analyse the error(s), adapt your approach, and provide a corrected payload."
         )
     else:
-        task = "Select the single most impactful payload for these terms."
+        task = "Select the single most directly usable payload for an active engagement."
 
     changes_field = (
-        '  "changes": bullet list of the specific tokens or lines changed from the previous attempt\n'
+        '  "changes": plain text, one change per line — list the specific tokens or lines changed from the previous attempt\n'
         if details else
         '  "changes": ""\n'
     )
 
     prompt = (
-        f"You are a penetration tester. Based on these HackTricks and PayloadsAllTheThings "
-        f"sections about {' '.join(terms)}:\n\n"
+        f"Based on these HackTricks and PayloadsAllTheThings sections about {' '.join(terms)}:\n\n"
         f"{context}\n\n"
-        f"{task} "
-        "Return ONLY a JSON object with these exact keys:\n"
+        f"{task}\n\n"
+        "Return ONLY a valid JSON object with these exact keys — no markdown fences, no text before or after:\n"
         '  "vulnerability": short name of the vulnerability and target (e.g. "SSTI via Handlebars (Node.js)")\n'
         '  "technique": one sentence on how the exploit works\n'
-        '  "language": the payload language as a pygments lexer name — one of: javascript, php, groovy, bash, python, java, text\n'
+        '  "language": the payload language as a pygments lexer name — one of: bash, groovy, html, java, javascript, perl, php, powershell, python, ruby, sql, text, xml\n'
         '  "payload": the raw payload string, properly indented and line-broken as it would appear in a code editor; no markdown fences\n'
         + changes_field +
-        '  "recommendation": one sentence explaining why this payload is the most impactful choice\n'
-        "No markdown. No explanation outside the JSON object."
+        '  "recommendation": one sentence explaining why this payload is the best choice for this engagement'
+    )
+
+    system = (
+        "You are an expert penetration tester assisting with authorized security assessments. "
+        "You provide precise, working exploit payloads based on established research. "
+        "You always respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
     )
 
     raw = ""
@@ -173,6 +177,7 @@ def ask_claude(matches, terms, details=None):
         response = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=2048,
+            system=system,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = response.content[0].text.strip()
@@ -208,13 +213,19 @@ def ask_claude(matches, terms, details=None):
 
 
 LANGUAGE_LABELS = {
-    "javascript": "JavaScript",
-    "php": "PHP",
-    "groovy": "Groovy",
     "bash": "Bash",
-    "python": "Python",
+    "groovy": "Groovy",
+    "html": "HTML",
     "java": "Java",
+    "javascript": "JavaScript",
+    "perl": "Perl",
+    "php": "PHP",
+    "powershell": "PowerShell",
+    "python": "Python",
+    "ruby": "Ruby",
+    "sql": "SQL",
     "text": "Text",
+    "xml": "XML",
 }
 
 
