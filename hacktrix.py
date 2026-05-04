@@ -167,14 +167,15 @@ def ask_claude(matches, terms, details=None):
     )
 
     system = (
-        "You are an expert penetration tester assisting with authorized security assessments. "
+        "IDENTITY: You are an expert penetration tester assisting with authorized security assessments. "
         "You provide precise, working exploit payloads based on established research. "
-        "For XSS payloads involving multi-step JavaScript (fetches, token extraction, chained requests), "
-        "always use <script> tags rather than event handler attributes like onerror= or onload= — "
+        "PAYLOAD RULES: "
+        "For any payload embedding JavaScript (XSS, CSRF chains, multi-step fetches), use <script> tags "
+        "rather than event handler attributes like onerror= or onload= — "
         "HTML attribute parsing breaks double quotes in embedded JS, making complex payloads syntactically invalid. "
         "Use relative URLs (e.g. /admin/dashboard) not absolute URLs — relative paths work regardless of how the victim accesses the app. "
         "Never append an extra fetch or request after a successful POST — only make the requests necessary to complete the attack. "
-        "You always respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
+        "OUTPUT FORMAT: Respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
     )
 
     raw = ""
@@ -236,7 +237,9 @@ LANGUAGE_LABELS = {
 
 def display_payload_result(data, sources):
     lang = data.get("language", "text")
-    label = LANGUAGE_LABELS.get(lang, lang.capitalize())
+    if lang not in LANGUAGE_LABELS:
+        lang = "text"
+    label = LANGUAGE_LABELS[lang]
 
     console.print()
     console.rule(f"[bold red]{data['vulnerability']}[/bold red]")
