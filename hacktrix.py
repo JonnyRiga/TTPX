@@ -169,6 +169,9 @@ def ask_claude(matches, terms, details=None):
     system = (
         "You are an expert penetration tester assisting with authorized security assessments. "
         "You provide precise, working exploit payloads based on established research. "
+        "For XSS payloads involving multi-step JavaScript (fetches, token extraction, chained requests), "
+        "always use <script> tags rather than event handler attributes like onerror= or onload= — "
+        "HTML attribute parsing breaks double quotes in embedded JS, making complex payloads syntactically invalid. "
         "You always respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
     )
 
