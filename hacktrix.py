@@ -172,6 +172,8 @@ def ask_claude(matches, terms, details=None):
         "For XSS payloads involving multi-step JavaScript (fetches, token extraction, chained requests), "
         "always use <script> tags rather than event handler attributes like onerror= or onload= — "
         "HTML attribute parsing breaks double quotes in embedded JS, making complex payloads syntactically invalid. "
+        "Use relative URLs (e.g. /admin/dashboard) not absolute URLs — relative paths work regardless of how the victim accesses the app. "
+        "Never append an extra fetch or request after a successful POST — only make the requests necessary to complete the attack. "
         "You always respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
     )
 
