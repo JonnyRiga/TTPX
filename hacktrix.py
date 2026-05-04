@@ -191,14 +191,19 @@ def ask_claude(matches, terms, details=None):
         end = raw.rfind("}") + 1
         if start != -1 and end > start:
             raw = raw[start:end]
-        return json.loads(raw)
+        data = json.loads(raw)
+        data["_usage"] = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+        return data
     except json.JSONDecodeError:
         return {
             "vulnerability": "Unknown",
             "technique": "Claude returned malformed JSON",
             "language": "text",
             "payload": raw,
-            "recommendation": "Raw Claude output shown above."
+            "recommendation": "Raw Claude output shown above.",
         }
     except anthropic.APIError as e:
         return {
@@ -206,7 +211,7 @@ def ask_claude(matches, terms, details=None):
             "technique": str(e),
             "language": "text",
             "payload": "",
-            "recommendation": ""
+            "recommendation": "",
         }
     except (IndexError, AttributeError) as e:
         return {
@@ -214,7 +219,7 @@ def ask_claude(matches, terms, details=None):
             "technique": f"Unexpected API response structure: {e}",
             "language": "text",
             "payload": "",
-            "recommendation": ""
+            "recommendation": "",
         }
 
 
@@ -260,6 +265,14 @@ def display_payload_result(data, sources):
     console.print()
     source_str = "  ".join(sources)
     console.print(f"[dim]Source: {escape(source_str)}[/dim]")
+
+    usage = data.get("_usage")
+    if usage:
+        inp, out = usage["input_tokens"], usage["output_tokens"]
+        # cache_read/cache_creation tokens exist on usage if caching is ever enabled — update formula then
+        cost = (inp * 3 + out * 15) / 1_000_000
+        console.print(f"[dim]Tokens: {inp:,} in / {out:,} out  ·  est. ${cost:.4f}  (Sonnet 4.6)[/dim]")
+
     console.rule()
 
 
