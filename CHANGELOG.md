@@ -9,6 +9,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-13] — --bypass optimisation
+
+### Changed
+- `--bypass` now feeds the offline token detection results directly into the
+  Claude prompt instead of asking Claude to re-detect them. Claude skips
+  detection entirely and focuses on bypass strategy.
+- Conditional prompting based on offline findings:
+  - Token present → prompt focuses on token stripping/prediction, leakage via
+    CORS/XSS, Content-Type manipulation, and method override tricks.
+  - No token → prompt focuses on SameSite enforcement, Origin/Referer validation,
+    Content-Type restrictions, and whether the offline PoC is already sufficient.
+    Includes a caveat that cookie-based tokens were not checked.
+- `csrf_token_present` and `token_field` removed from Claude's JSON response
+  schema — already known from offline detection, no longer needed in the output.
+- `--bypass` hint ("Use --bypass for Claude's analysis") suppressed when bypass
+  analysis is already being shown alongside the token warning.
+
+---
+
 ## [2026-05-13] — CSRF token detection
 
 ### Added
