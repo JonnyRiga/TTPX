@@ -1,11 +1,22 @@
 # Changelog
 
-All notable changes to hacktrix are documented here.
+All notable changes to ttpx are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
 ## [Unreleased]
+
+---
+
+## [2026-05-13] — Rename: hacktrix → ttpx
+
+### Changed
+- Tool renamed from `hacktrix` to `ttpx` (Tactics, Techniques, Procedures + x).
+- `hacktrix.py` → `ttpx.py`, `hacktrix.1` → `ttpx.1`, `test_hacktrix.py` → `test_ttpx.py`.
+- Symlink updated: `/usr/local/bin/ttpx → ~/Tools/ttpx.py`.
+- Session log renamed: `hacktrix-session.log` → `ttpx-session.log`.
+- `htm` / `htx` shell aliases replaced with `ttm='ttpx -m'`.
 
 ---
 
@@ -63,7 +74,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [2026-05-13] — CSRF token detection
 
 ### Added
-- Offline CSRF token detection in `--csrf`: after generating the PoC, hacktrix
+- Offline CSRF token detection in `--csrf`: after generating the PoC, ttpx
   checks the request for known CSRF token field names (form-encoded and JSON bodies)
   and headers, and warns immediately if any are found — no API call required.
   Covers common frameworks: Django (`csrfmiddlewaretoken`), Rails (`authenticity_token`),
@@ -151,7 +162,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Result cap** (`MAX_PAYLOAD_MATCHES = 10`): more than 10 matches triggers a
   warning and caps the Claude context to keep costs predictable.
 - **Session log**: every `-p` call appends a timestamped entry (terms, vulnerability,
-  first payload line) to `~/Tools/hacktrix-session.log`. Suppress with `--no-log`.
+  first payload line) to `~/Tools/ttpx-session.log`. Suppress with `--no-log`.
 - **Multi-pass `-d`**: repeat `--details` / `-d` to chain multiple error contexts
   across attempts; prompt distinguishes singular vs plural correctly.
 - **Source header in mirrored files**: `-m` output includes a `# Source:` line with
@@ -181,7 +192,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   (syntax-highlighted payload, copy-paste block, recommendation, source footer).
 - Language-aware rendering: Claude returns a pygments lexer name; the payload is
   highlighted accordingly.
-- Man page (`hacktrix.1`), detailed `--help` epilog, and README.
+- Man page (`ttpx.1`), detailed `--help` epilog, and README.
 - PayloadsAllTheThings (PATT) as a second search source alongside HackTricks.
 - `source_label()` helper: short `[hacktricks]` / `[payloadsallthethings]` tags used
   in output and Claude context (avoids leaking absolute paths to the API).
@@ -208,9 +219,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `extract_snippet()`: pull the most relevant section from a matched file.
 - `ask_claude()`: send matched content to Claude API, receive a structured JSON
   payload response (vulnerability, technique, language, payload, recommendation).
-- `hacktrix -f TERM [TERM ...]`: search and display results.
-- `hacktrix -p TERM [TERM ...]`: search then generate a payload via Claude.
+- `ttpx -f TERM [TERM ...]`: search and display results.
+- `ttpx -p TERM [TERM ...]`: search then generate a payload via Claude.
   Requires `ANTHROPIC_API_KEY`.
-- `hacktrix -l`: list top-level categories in both sources.
-- `hacktrix -u`: `git pull` both knowledge bases and print a change summary.
-- Symlink to `/usr/local/bin/hacktrix` for system-wide access.
+- `ttpx -l`: list top-level categories in both sources.
+- `ttpx -u`: `git pull` both knowledge bases and print a change summary.
+- Symlink to `/usr/local/bin/ttpx` for system-wide access.

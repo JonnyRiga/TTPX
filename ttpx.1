@@ -1,25 +1,25 @@
-.TH HACKTRIX 1 "2026-05-13" "hacktrix" "Security Research Tools"
+.TH TTPX 1 "2026-05-13" "ttpx" "Security Research Tools"
 .SH NAME
-hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniques; generate CSRF PoC files
+ttpx \- search HackTricks and PayloadsAllTheThings for exploitation techniques; generate CSRF PoC files
 .SH SYNOPSIS
-.B hacktrix
+.B ttpx
 .B \-l
 [
 .B \-\-since
 .I N[d]
 ]
 .br
-.B hacktrix
+.B ttpx
 .B \-u
 .br
-.B hacktrix
+.B ttpx
 .B \-f
 .I TERM
 [
 .I TERM
 \&...]
 .br
-.B hacktrix
+.B ttpx
 .B \-p
 .I TERM
 [
@@ -30,7 +30,7 @@ hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniqu
 .I CONTEXT
 ]
 .br
-.B hacktrix
+.B ttpx
 .B \-m
 .I PATH
 [
@@ -38,14 +38,14 @@ hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniqu
 .I TERM
 ]
 .br
-.B hacktrix
+.B ttpx
 .B \-\-csrf
 .I FILE
 [
 .B \-\-bypass
 ]
 .SH DESCRIPTION
-.B hacktrix
+.B ttpx
 searches local clones of HackTricks and PayloadsAllTheThings (PATT) for
 exploitation techniques matching all provided search terms.
 .PP
@@ -174,7 +174,7 @@ Only meaningful with
 Skip auto\-logging this
 .B \-p
 result to
-.IR ~/Tools/hacktrix-session.log .
+.IR ~/Tools/ttpx-session.log .
 By default every
 .B \-p
 call appends a timestamped entry (terms, vulnerability, first payload line) to that log.
@@ -278,9 +278,9 @@ Browse categories (update sources first):
 .PP
 .RS
 .nf
-hacktrix \-u
-hacktrix \-l
-hacktrix \-l \-\-since 7d
+ttpx \-u
+ttpx \-l
+ttpx \-l \-\-since 7d
 .fi
 .RE
 .PP
@@ -288,8 +288,8 @@ Browse matching entries before committing to a payload:
 .PP
 .RS
 .nf
-hacktrix \-f ssti handlebars
-hacktrix \-f lfi php windows iis
+ttpx \-f ssti handlebars
+ttpx \-f lfi php windows iis
 .fi
 .RE
 .PP
@@ -297,10 +297,10 @@ Generate a payload directly:
 .PP
 .RS
 .nf
-hacktrix \-p ssti handlebars groovy rce
-hacktrix \-p sqli union mysql
-hacktrix \-p xss csp bypass reflected
-hacktrix \-p lfi php windows iis read
+ttpx \-p ssti handlebars groovy rce
+ttpx \-p sqli union mysql
+ttpx \-p xss csp bypass reflected
+ttpx \-p lfi php windows iis read
 .fi
 .RE
 .PP
@@ -308,9 +308,9 @@ Adapt after a failed attempt:
 .PP
 .RS
 .nf
-hacktrix \-p ssti handlebars groovy rce \-d "'require' is not defined"
-hacktrix \-p sqli union mysql \-d "WAF blocking SELECT and UNION keywords"
-hacktrix \-p lfi php \-d "../etc/passwd filtered, server returned 403"
+ttpx \-p ssti handlebars groovy rce \-d "'require' is not defined"
+ttpx \-p sqli union mysql \-d "WAF blocking SELECT and UNION keywords"
+ttpx \-p lfi php \-d "../etc/passwd filtered, server returned 403"
 .fi
 .RE
 .PP
@@ -318,7 +318,7 @@ Mirror a file from a \-f result (full file):
 .PP
 .RS
 .nf
-hacktrix \-m "Server Side Template Injection/JavaScript.md"
+ttpx \-m "Server Side Template Injection/JavaScript.md"
 .fi
 .RE
 .PP
@@ -326,8 +326,8 @@ Mirror a specific section only:
 .PP
 .RS
 .nf
-hacktrix \-m "Server Side Template Injection/JavaScript.md" \-s handlebars
-hacktrix \-m "File Inclusion/README.md" \-s php
+ttpx \-m "Server Side Template Injection/JavaScript.md" \-s handlebars
+ttpx \-m "File Inclusion/README.md" \-s php
 .fi
 .RE
 .PP
@@ -335,8 +335,8 @@ Generate a CSRF PoC from a captured request:
 .PP
 .RS
 .nf
-hacktrix \-\-csrf req.txt                   # offline PoC, no API cost
-hacktrix \-\-csrf req.txt \-\-bypass          # PoC + Claude bypass analysis
+ttpx \-\-csrf req.txt                   # offline PoC, no API cost
+ttpx \-\-csrf req.txt \-\-bypass          # PoC + Claude bypass analysis
 .fi
 .RE
 .PP
@@ -344,12 +344,12 @@ Typical workflow:
 .PP
 .RS
 .nf
-hacktrix \-u                                                        # keep sources current
-hacktrix \-l \-\-since 7d                                             # browse recent updates
-hacktrix \-f ssti handlebars                                        # see what files match
-hacktrix \-m "Server Side Template Injection/JavaScript.md" \-s handlebars  # grab the section
-hacktrix \-p ssti handlebars groovy                                  # generate a payload
-hacktrix \-p ssti handlebars groovy \-d "'require' is not defined"    # adapt after error
+ttpx \-u                                                        # keep sources current
+ttpx \-l \-\-since 7d                                             # browse recent updates
+ttpx \-f ssti handlebars                                        # see what files match
+ttpx \-m "Server Side Template Injection/JavaScript.md" \-s handlebars  # grab the section
+ttpx \-p ssti handlebars groovy                                  # generate a payload
+ttpx \-p ssti handlebars groovy \-d "'require' is not defined"    # adapt after error
 .fi
 .RE
 .SH NOTES

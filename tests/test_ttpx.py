@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass, detect_csrf_tokens, display_csrf_poc
+from ttpx import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass, detect_csrf_tokens, display_csrf_poc
 from unittest.mock import patch, MagicMock
 
 
@@ -168,7 +168,7 @@ def test_ask_claude_includes_details_in_prompt():
 
 def test_cli_find_no_results():
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "-f", "nonexistentterm123xyz"],
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "-f", "nonexistentterm123xyz"],
         capture_output=True, text=True
     )
     assert result.returncode == 0
@@ -178,7 +178,7 @@ def test_cli_payload_flag_without_api_key():
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "-p", "ssti"],
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "-p", "ssti"],
         capture_output=True, text=True, env=env
     )
     assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
@@ -186,7 +186,7 @@ def test_cli_payload_flag_without_api_key():
 
 def test_cli_requires_flag():
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py")],
+        ["python", str(Path.home() / "Tools" / "ttpx.py")],
         capture_output=True, text=True
     )
     assert result.returncode != 0
@@ -295,42 +295,42 @@ def test_extract_section_is_case_insensitive():
 
 
 def test_list_categories_shows_directories(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     ht = tmp_path / "hacktricks"
     patt = tmp_path / "patt"
     (ht / "Web Attacks").mkdir(parents=True)
     (ht / "Network").mkdir(parents=True)
     (ht / ".git").mkdir(parents=True)
     (patt / "SQL Injection").mkdir(parents=True)
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", patt)
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", patt)
     # Should not raise; hidden dirs excluded
-    hacktrix.list_categories()
+    ttpx.list_categories()
 
 
 def test_list_categories_excludes_hidden_dirs(tmp_path, monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     ht = tmp_path / "hacktricks"
     (ht / ".git").mkdir(parents=True)
     (ht / "Web Attacks").mkdir(parents=True)
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
-    hacktrix.list_categories()
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    ttpx.list_categories()
     output = buf.getvalue()
     assert ".git" not in output
     assert "Web Attacks" in output
 
 
 def test_update_sources_already_up_to_date(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     ht = tmp_path / "hacktricks"
     ht.mkdir()
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
 
     def fake_run(cmd, **kwargs):
         result = MagicMock()
@@ -340,16 +340,16 @@ def test_update_sources_already_up_to_date(tmp_path, monkeypatch):
             result.stderr = ""
         return result
 
-    monkeypatch.setattr(hacktrix.subprocess, "run", fake_run)
-    hacktrix.update_sources()
+    monkeypatch.setattr(ttpx.subprocess, "run", fake_run)
+    ttpx.update_sources()
 
 
 def test_update_sources_prints_stat_on_new_commits(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     ht = tmp_path / "hacktricks"
     ht.mkdir()
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
 
     call_count = {"n": 0}
 
@@ -365,17 +365,17 @@ def test_update_sources_prints_stat_on_new_commits(tmp_path, monkeypatch):
         call_count["n"] += 1
         return result
 
-    monkeypatch.setattr(hacktrix.subprocess, "run", fake_run)
-    hacktrix.update_sources()
+    monkeypatch.setattr(ttpx.subprocess, "run", fake_run)
+    ttpx.update_sources()
     assert call_count["n"] >= 2
 
 
 def test_update_sources_handles_git_failure(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     ht = tmp_path / "hacktricks"
     ht.mkdir()
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
 
     def fake_run(cmd, **kwargs):
         result = MagicMock()
@@ -384,8 +384,8 @@ def test_update_sources_handles_git_failure(tmp_path, monkeypatch):
         result.stderr = "not a git repository"
         return result
 
-    monkeypatch.setattr(hacktrix.subprocess, "run", fake_run)
-    hacktrix.update_sources()  # should not raise
+    monkeypatch.setattr(ttpx.subprocess, "run", fake_run)
+    ttpx.update_sources()  # should not raise
 
 
 @pytest.mark.skipif(
@@ -394,24 +394,24 @@ def test_update_sources_handles_git_failure(tmp_path, monkeypatch):
 )
 def test_cli_list_flag():
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "-l"],
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "-l"],
         capture_output=True, text=True
     )
     assert result.returncode == 0
 
 
 def test_cli_update_flag_missing_repos(monkeypatch, tmp_path):
-    import hacktrix
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", tmp_path / "missing_ht")
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing_patt")
+    import ttpx
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", tmp_path / "missing_ht")
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing_patt")
 
     with pytest.raises(SystemExit) as exc:
-        hacktrix.update_sources()
+        ttpx.update_sources()
     assert exc.value.code != 0
 
 
 def test_recently_changed_dirs_parses_git_output(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     captured = {}
 
     def fake_run(cmd, **kw):
@@ -421,33 +421,33 @@ def test_recently_changed_dirs_parses_git_output(tmp_path, monkeypatch):
             returncode=0
         )
 
-    monkeypatch.setattr(hacktrix.subprocess, "run", fake_run)
-    dirs = hacktrix._recently_changed_dirs(tmp_path, 7)
+    monkeypatch.setattr(ttpx.subprocess, "run", fake_run)
+    dirs = ttpx._recently_changed_dirs(tmp_path, 7)
     assert "Server Side Template Injection" in dirs
     assert "SQL Injection" in dirs
     assert "--since=7 days ago" in captured["cmd"]
 
 
 def test_recently_changed_dirs_ignores_blank_lines(tmp_path, monkeypatch):
-    import hacktrix
-    monkeypatch.setattr(hacktrix.subprocess, "run", lambda cmd, **kw: MagicMock(
+    import ttpx
+    monkeypatch.setattr(ttpx.subprocess, "run", lambda cmd, **kw: MagicMock(
         stdout="\n\nSQL Injection/README.md\n\n",
         returncode=0
     ))
-    dirs = hacktrix._recently_changed_dirs(tmp_path, 7)
+    dirs = ttpx._recently_changed_dirs(tmp_path, 7)
     assert "SQL Injection" in dirs
     assert "" not in dirs
 
 
 def test_recently_changed_dirs_handles_src_prefix(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     # Simulate HackTricks GitBook layout: content under src/
     (tmp_path / "src").mkdir()
-    monkeypatch.setattr(hacktrix.subprocess, "run", lambda cmd, **kw: MagicMock(
+    monkeypatch.setattr(ttpx.subprocess, "run", lambda cmd, **kw: MagicMock(
         stdout="src/pentesting-web/ssti.md\n\nsrc/network/README.md\n",
         returncode=0
     ))
-    dirs = hacktrix._recently_changed_dirs(tmp_path, 7)
+    dirs = ttpx._recently_changed_dirs(tmp_path, 7)
     assert "pentesting-web" in dirs
     assert "network" in dirs
     assert "src" not in dirs
@@ -464,18 +464,18 @@ def test_content_root_returns_base_when_no_src(tmp_path):
 
 def test_list_categories_descends_into_src(tmp_path, monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     ht = tmp_path / "hacktricks"
     src = ht / "src"
     (src / "pentesting-web").mkdir(parents=True)
     (src / "network").mkdir(parents=True)
     (ht / "scripts").mkdir()  # top-level non-content dir; should not appear
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
-    hacktrix.list_categories()
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    ttpx.list_categories()
     output = buf.getvalue()
     assert "pentesting-web" in output
     assert "network" in output
@@ -484,19 +484,19 @@ def test_list_categories_descends_into_src(tmp_path, monkeypatch):
 
 def test_list_categories_since_filters_to_recent(tmp_path, monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     ht = tmp_path / "hacktricks"
     (ht / "SQL Injection").mkdir(parents=True)
     (ht / "Network").mkdir(parents=True)
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
-    monkeypatch.setattr(hacktrix.subprocess, "run", lambda cmd, **kw: MagicMock(
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx.subprocess, "run", lambda cmd, **kw: MagicMock(
         stdout="SQL Injection/README.md\n", returncode=0
     ))
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
-    hacktrix.list_categories(since_days=7)
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    ttpx.list_categories(since_days=7)
     output = buf.getvalue()
     assert "SQL Injection" in output
     assert "Network" not in output
@@ -505,16 +505,16 @@ def test_list_categories_since_filters_to_recent(tmp_path, monkeypatch):
 
 def test_list_categories_shows_count_footer(tmp_path, monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     ht = tmp_path / "hacktricks"
     (ht / "Web Attacks").mkdir(parents=True)
     (ht / "Network").mkdir(parents=True)
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
-    hacktrix.list_categories()
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    ttpx.list_categories()
     output = buf.getvalue()
     assert "2 categories" in output
 
@@ -567,10 +567,10 @@ def test_ask_claude_changes_field_empty_without_details():
 
 def test_display_payload_result_shows_changes_section(monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
     data = {
         "vulnerability": "SSTI via Handlebars",
         "technique": "RCE via prototype chain",
@@ -579,7 +579,7 @@ def test_display_payload_result_shows_changes_section(monkeypatch):
         "changes": "- Used process.mainModule instead of require",
         "recommendation": "Most impactful.",
     }
-    hacktrix.display_payload_result(data, ["[hacktricks] ssti.md"])
+    ttpx.display_payload_result(data, ["[hacktricks] ssti.md"])
     output = buf.getvalue()
     assert "What changed" in output
     assert "process.mainModule" in output
@@ -587,10 +587,10 @@ def test_display_payload_result_shows_changes_section(monkeypatch):
 
 def test_display_payload_result_no_changes_section_when_empty(monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
     data = {
         "vulnerability": "SSTI via Handlebars",
         "technique": "RCE via prototype chain",
@@ -599,17 +599,17 @@ def test_display_payload_result_no_changes_section_when_empty(monkeypatch):
         "changes": "",
         "recommendation": "Most impactful.",
     }
-    hacktrix.display_payload_result(data, ["[hacktricks] ssti.md"])
+    ttpx.display_payload_result(data, ["[hacktricks] ssti.md"])
     output = buf.getvalue()
     assert "What changed" not in output
 
 
 def test_display_payload_result_includes_raw_copy_paste_block(monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
     payload = "{{#with 'x' as |string|}}\n  {{string.constructor payload}}\n{{/with}}"
     data = {
         "vulnerability": "SSTI",
@@ -619,25 +619,25 @@ def test_display_payload_result_includes_raw_copy_paste_block(monkeypatch):
         "changes": "",
         "recommendation": "Most impactful.",
     }
-    hacktrix.display_payload_result(data, [])
+    ttpx.display_payload_result(data, [])
     output = buf.getvalue()
     assert "copy-paste" in output
     assert "{{#with" in output
 
 
 def test_mirror_file_rejects_path_traversal(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     ht = tmp_path / "hacktricks"
     patt = tmp_path / "patt"
     ht.mkdir()
     patt.mkdir()
     sensitive = tmp_path / "secret.md"
     sensitive.write_text("secret content")
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", patt)
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", patt)
 
     with pytest.raises(SystemExit) as exc:
-        hacktrix.mirror_file("../secret.md")
+        ttpx.mirror_file("../secret.md")
 
     assert exc.value.code != 0
     assert not sensitive.read_text() == ""  # file not read or modified
@@ -693,18 +693,18 @@ def test_ask_claude_single_detail_uses_singular_label():
 
 def test_find_matches_capped_in_main(tmp_path, monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     # Create more files than MAX_PAYLOAD_MATCHES
     for i in range(MAX_PAYLOAD_MATCHES + 3):
         md = tmp_path / f"file{i}.md"
         md.write_text("## SSTI\nhandlebars rce payload here")
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", tmp_path)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", tmp_path)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
 
-    results = hacktrix.find_matches(["handlebars", "rce"], search_paths=[tmp_path])
+    results = ttpx.find_matches(["handlebars", "rce"], search_paths=[tmp_path])
     assert len(results) > MAX_PAYLOAD_MATCHES
     capped = results[:MAX_PAYLOAD_MATCHES]
     assert len(capped) == MAX_PAYLOAD_MATCHES
@@ -713,15 +713,15 @@ def test_find_matches_capped_in_main(tmp_path, monkeypatch):
 # Task #8: source header in mirrored file
 
 def test_mirror_file_includes_source_header(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     ht = tmp_path / "hacktricks"
     ht.mkdir()
     md = ht / "ssti.md"
     md.write_text("## SSTI\nsome content here")
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
     monkeypatch.chdir(tmp_path)
-    hacktrix.mirror_file("ssti.md")
+    ttpx.mirror_file("ssti.md")
     out = tmp_path / "ssti.txt"
     content = out.read_text()
     assert "# Source:" in content
@@ -734,18 +734,18 @@ def test_mirror_file_includes_source_header(tmp_path, monkeypatch):
 
 def test_list_categories_shows_file_count(tmp_path, monkeypatch):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     ht = tmp_path / "hacktricks"
     cat = ht / "SQL Injection"
     cat.mkdir(parents=True)
     (cat / "README.md").write_text("content")
     (cat / "mysql.md").write_text("content")
-    monkeypatch.setattr(hacktrix, "HACKTRICKS_PATH", ht)
-    monkeypatch.setattr(hacktrix, "PATT_PATH", tmp_path / "missing")
+    monkeypatch.setattr(ttpx, "HACKTRICKS_PATH", ht)
+    monkeypatch.setattr(ttpx, "PATT_PATH", tmp_path / "missing")
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
-    hacktrix.list_categories()
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    ttpx.list_categories()
     output = buf.getvalue()
     assert "SQL Injection" in output
     assert "2" in output  # 2 .md files
@@ -754,9 +754,9 @@ def test_list_categories_shows_file_count(tmp_path, monkeypatch):
 # Task #10: auto-log
 
 def test_log_payload_result_writes_to_log(tmp_path, monkeypatch):
-    import hacktrix
-    log_path = tmp_path / "hacktrix-session.log"
-    monkeypatch.setattr(hacktrix, "LOG_PATH", log_path)
+    import ttpx
+    log_path = tmp_path / "ttpx-session.log"
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
     data = {
         "vulnerability": "SSTI via Handlebars",
         "payload": "{{7*7}}\nmore lines",
@@ -770,10 +770,10 @@ def test_log_payload_result_writes_to_log(tmp_path, monkeypatch):
 
 
 def test_log_payload_result_appends_not_overwrites(tmp_path, monkeypatch):
-    import hacktrix
-    log_path = tmp_path / "hacktrix-session.log"
+    import ttpx
+    log_path = tmp_path / "ttpx-session.log"
     log_path.write_text("existing entry\n\n")
-    monkeypatch.setattr(hacktrix, "LOG_PATH", log_path)
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
     data = {"vulnerability": "XSS", "payload": "<script>", "recommendation": "r"}
     log_payload_result(["xss"], data)
     content = log_path.read_text()
@@ -1181,7 +1181,7 @@ def test_cli_csrf_generates_poc_file(tmp_path):
         "email=evil%40attacker.com"
     )
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "--csrf", str(req)],
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "--csrf", str(req)],
         capture_output=True, text=True, cwd=str(tmp_path)
     )
     assert result.returncode == 0
@@ -1201,7 +1201,7 @@ def test_cli_csrf_bypass_without_api_key(tmp_path):
     env = os.environ.copy()
     env.pop("ANTHROPIC_API_KEY", None)
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "--csrf", str(req), "--bypass"],
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "--csrf", str(req), "--bypass"],
         capture_output=True, text=True, env=env, cwd=str(tmp_path)
     )
     assert result.returncode != 0
@@ -1376,7 +1376,7 @@ def test_cli_csrf_warns_on_token_detection(tmp_path):
         "data=x&csrf_token=abc123"
     )
     result = subprocess.run(
-        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "--csrf", str(req)],
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "--csrf", str(req)],
         capture_output=True, text=True, cwd=str(tmp_path)
     )
     assert result.returncode == 0
@@ -1386,10 +1386,10 @@ def test_cli_csrf_warns_on_token_detection(tmp_path):
 
 def test_display_csrf_poc_suppresses_bypass_hint_when_bypass_active(monkeypatch, tmp_path):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
     monkeypatch.chdir(tmp_path)
     parsed = {
         "method": "POST", "url": "https://example.com/x",
@@ -1409,10 +1409,10 @@ def test_display_csrf_poc_suppresses_bypass_hint_when_bypass_active(monkeypatch,
 
 def test_display_csrf_poc_shows_bypass_hint_without_bypass(monkeypatch, tmp_path):
     import io
-    import hacktrix
+    import ttpx
     from rich.console import Console as RichConsole
     buf = io.StringIO()
-    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
     monkeypatch.chdir(tmp_path)
     parsed = {
         "method": "POST", "url": "https://example.com/x",
@@ -1426,10 +1426,10 @@ def test_display_csrf_poc_shows_bypass_hint_without_bypass(monkeypatch, tmp_path
 
 
 def test_log_payload_result_silent_on_error(tmp_path, monkeypatch):
-    import hacktrix
+    import ttpx
     # Point to a path where we can't write (file is a directory)
-    log_path = tmp_path / "hacktrix-session.log"
+    log_path = tmp_path / "ttpx-session.log"
     log_path.mkdir()
-    monkeypatch.setattr(hacktrix, "LOG_PATH", log_path)
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
     data = {"vulnerability": "X", "payload": "p", "recommendation": "r"}
     log_payload_result(["x"], data)  # must not raise

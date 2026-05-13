@@ -1,3 +1,58 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# knowledge bases (cloned separately)
+hacktricks/
+payloadsallthethings/
+
+# personal tools and scripts not part of ttpx
+privy.sh
+privy.ps1
+privyctf.sh
+pwn-ext.py
+pwn-int.py
+note-bot.py
+mscanz.sh
+scanhost.sh
+portsweep.sh
+psweep.sh
+vhostcheck.sh
+vhost-fuzzer.sh
+webcheck.sh
+httpenum.sh
+lootserve.sh
+credsniff.sh
+sthunt.sh
+screenshotweb.sh
+jscan.sh
+grabcode.sh
+ctfunwrap.sh
+artifactr.sh
+copy_ip.sh
+notesnap.sh
+tmux_ip_status.sh
+install_tools.sh
+linpeas.sh
+linux_priv_esc.py
+paramfuzz
+pspy
+nc64.exe
+winpeas.exe
+winPEASany_ofs.exe
+PowerView.ps1
+rev.ps1
+shannon/
+
+# personal documents and credentials
+Documents/
+custom_creds/
+Scripts/
+docs/
+
+# session logs
+ttpx-session.log
+hacktrix-session.log
+
+# misc
+.claude/

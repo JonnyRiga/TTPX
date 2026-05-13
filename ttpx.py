@@ -21,7 +21,7 @@ console = Console()
 
 HACKTRICKS_PATH = Path.home() / "Tools" / "hacktricks"
 PATT_PATH = Path.home() / "Tools" / "payloadsallthethings"
-LOG_PATH = Path.home() / "Tools" / "hacktrix-session.log"
+LOG_PATH = Path.home() / "Tools" / "ttpx-session.log"
 MAX_PAYLOAD_MATCHES = 10
 
 
@@ -874,7 +874,7 @@ def log_payload_result(terms, data):
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="hacktrix",
+        prog="ttpx",
         description=(
             "Search HackTricks and PayloadsAllTheThings for exploitation techniques.\n\n"
             "Use -f to browse matching entries (fast, no API cost), then use -p with\n"
@@ -887,18 +887,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  hacktrix -l                                         # browse all categories\n"
-            "  hacktrix -l --since 7d                              # categories updated in last 7 days\n"
-            "  hacktrix -u                                         # update knowledge bases\n"
-            "  hacktrix -f ssti handlebars\n"
-            "  hacktrix -f lfi php windows\n"
-            "  hacktrix -p ssti handlebars groovy rce\n"
-            "  hacktrix -p sqli union mysql -d \"WAF blocking SELECT keyword\"\n"
-            "  hacktrix -p lfi php -d \"../etc/passwd filtered, got 403\"\n"
-            "  hacktrix -m \"Server Side Template Injection/JavaScript.md\"\n"
-            "  hacktrix -m \"Server Side Template Injection/JavaScript.md\" -s handlebars\n"
-            "  hacktrix --csrf req.txt                                     # offline CSRF PoC from raw request\n"
-            "  hacktrix --csrf req.txt --bypass                            # PoC + Claude bypass suggestions\n\n"
+            "  ttpx -l                                         # browse all categories\n"
+            "  ttpx -l --since 7d                              # categories updated in last 7 days\n"
+            "  ttpx -u                                         # update knowledge bases\n"
+            "  ttpx -f ssti handlebars\n"
+            "  ttpx -f lfi php windows\n"
+            "  ttpx -p ssti handlebars groovy rce\n"
+            "  ttpx -p sqli union mysql -d \"WAF blocking SELECT keyword\"\n"
+            "  ttpx -p lfi php -d \"../etc/passwd filtered, got 403\"\n"
+            "  ttpx -m \"Server Side Template Injection/JavaScript.md\"\n"
+            "  ttpx -m \"Server Side Template Injection/JavaScript.md\" -s handlebars\n"
+            "  ttpx --csrf req.txt                                     # offline CSRF PoC from raw request\n"
+            "  ttpx --csrf req.txt --bypass                            # PoC + Claude bypass suggestions\n\n"
             "sources:\n"
             "  HackTricks:           ~/Tools/hacktricks\n"
             "  PayloadsAllTheThings: ~/Tools/payloadsallthethings\n\n"
@@ -926,7 +926,7 @@ def main():
     parser.add_argument("--since", metavar="N[d]",
                         help="use with -l: filter categories updated in the last N days (e.g. 7d or 7)")
     parser.add_argument("--no-log", dest="no_log", action="store_true",
-                        help="skip auto-logging this -p result to ~/Tools/hacktrix-session.log")
+                        help="skip auto-logging this -p result to ~/Tools/ttpx-session.log")
     parser.add_argument("--bypass", action="store_true",
                         help="use with --csrf: call Claude to suggest token bypass and Content-Type attack variants (requires ANTHROPIC_API_KEY)")
     args = parser.parse_args()
