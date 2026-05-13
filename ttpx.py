@@ -566,7 +566,7 @@ def parse_raw_request(file_path):
     if ":" in bare_host:
         scheme = "https" if bare_host.rsplit(":", 1)[-1] == "443" else "http"
     else:
-        scheme = "https"  # no explicit port — assume standard HTTPS
+        scheme = "http"  # no explicit port — default http; use Host: host:443 for HTTPS
     url = f"{scheme}://{host}{path}" if host else path
 
     content_type = headers.get("Content-Type", headers.get("content-type", ""))

@@ -799,7 +799,7 @@ def test_parse_raw_request_form_post(tmp_path):
     ))
     parsed = parse_raw_request(req)
     assert parsed["method"] == "POST"
-    assert parsed["url"] == "https://example.com/account/change-email"
+    assert parsed["url"] == "http://example.com/account/change-email"
     assert parsed["content_type"] == "application/x-www-form-urlencoded"
     assert "email=attacker" in parsed["body"]
 
@@ -825,7 +825,7 @@ def test_parse_raw_request_get(tmp_path):
     ))
     parsed = parse_raw_request(req)
     assert parsed["method"] == "GET"
-    assert parsed["url"] == "https://example.com/admin/delete?id=5"
+    assert parsed["url"] == "http://example.com/admin/delete?id=5"
     assert parsed["body"] == ""
 
 
@@ -862,13 +862,13 @@ def test_parse_raw_request_http_scheme_on_nonstandard_port(tmp_path):
     assert parsed["url"].startswith("http://")
 
 
-def test_parse_raw_request_https_default_no_port(tmp_path):
+def test_parse_raw_request_http_default_no_port(tmp_path):
     req = _write_req(tmp_path, (
         "GET /profile HTTP/1.1\n"
         "Host: example.com\n"
     ))
     parsed = parse_raw_request(req)
-    assert parsed["url"].startswith("https://")
+    assert parsed["url"].startswith("http://")
 
 
 def test_generate_csrf_poc_escapes_html_in_field_values(tmp_path):
@@ -923,7 +923,7 @@ def test_generate_csrf_poc_form_post(tmp_path):
     parsed = parse_raw_request(req)
     html, poc_type = generate_csrf_poc(parsed)
     assert poc_type == "form"
-    assert 'action="https://example.com/change-email"' in html
+    assert 'action="http://example.com/change-email"' in html
     assert 'method="POST"' in html
     assert 'name="email"' in html
     assert 'csrf-form' in html
@@ -956,7 +956,7 @@ def test_generate_csrf_poc_get(tmp_path):
     html, poc_type = generate_csrf_poc(parsed)
     assert poc_type == "get"
     assert "<img" in html
-    assert "https://example.com/admin/reset?user=5" in html
+    assert "http://example.com/admin/reset?user=5" in html
 
 
 def test_generate_csrf_poc_html5_boilerplate(tmp_path):
