@@ -9,6 +9,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-13] — CSRF PoC HTML5 boilerplate
+
+### Fixed
+- Generated `csrf_poc.html` now includes proper HTML5 boilerplate: `<!DOCTYPE html>`,
+  `lang="en"`, and a `<head>` with UTF-8 charset, viewport meta, and
+  `<title>CSRF PoC</title>`. Previously the output was a bare `<html><body>` skeleton.
+  Output now matches Caido's PoC generator format.
+- Shared boilerplate extracted to `_HTML_OPEN` / `_HTML_CLOSE` module-level constants
+  to keep all four PoC branches (GET, JSON, multipart, form-urlencoded) DRY.
+
+### Tests
+- Added `test_generate_csrf_poc_html5_boilerplate` to assert DOCTYPE, lang, charset,
+  viewport, and title are present in generated output (103 tests total).
+
+---
+
 ## [2026-05-13] — Doc accuracy pass
 
 ### Fixed

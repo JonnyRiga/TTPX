@@ -959,6 +959,18 @@ def test_generate_csrf_poc_get(tmp_path):
     assert "https://example.com/admin/reset?user=5" in html
 
 
+def test_generate_csrf_poc_html5_boilerplate(tmp_path):
+    req = _write_req(tmp_path, "GET /x HTTP/1.1\nHost: example.com\n")
+    parsed = parse_raw_request(req)
+    html, _ = generate_csrf_poc(parsed)
+    assert html.startswith("<!DOCTYPE html>")
+    assert '<html lang="en">' in html
+    assert '<meta charset="UTF-8">' in html
+    assert 'name="viewport"' in html
+    assert "<title>CSRF PoC</title>" in html
+    assert html.rstrip().endswith("</html>")
+
+
 def test_generate_csrf_poc_multipart(tmp_path):
     req = _write_req(tmp_path, (
         "POST /upload HTTP/1.1\n"

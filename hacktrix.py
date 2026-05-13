@@ -641,7 +641,7 @@ _HTML_OPEN = (
     "</head>\n"
     "<body>\n"
 )
-_HTML_CLOSE = "</body>\n</html>"
+_HTML_CLOSE = "</body>\n</html>\n"
 
 
 def generate_csrf_poc(parsed):
@@ -704,6 +704,7 @@ def generate_csrf_poc(parsed):
         f'    <input type="hidden" name="{html_escape(name, quote=True)}" value="{html_escape(value, quote=True)}" />'
         for name, value in fields
     )
+    # trailing "  " aligns the closing </form> tag after the last <input> line
     inputs_block = f"\n{inputs}\n  " if inputs else ""
     inner = (
         f'  <form action="{safe_url_attr}" method="{html_escape(method, quote=True)}" id="csrf-form">'
