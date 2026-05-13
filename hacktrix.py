@@ -786,7 +786,10 @@ def main():
             "Search HackTricks and PayloadsAllTheThings for exploitation techniques.\n\n"
             "Use -f to browse matching entries (fast, no API cost), then use -p with\n"
             "refined terms to generate a ready-to-use payload via Claude. Feed errors\n"
-            "back with -d to get an adapted payload on the next attempt."
+            "back with -d to get an adapted payload on the next attempt.\n"
+            "Use --csrf to generate a self-contained CSRF PoC HTML file from a raw\n"
+            "captured request (Burp/Caido format). Add --bypass to get Claude's\n"
+            "analysis of token bypass and Content-Type attack variants."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -807,7 +810,7 @@ def main():
             "  HackTricks:           ~/Tools/hacktricks\n"
             "  PayloadsAllTheThings: ~/Tools/payloadsallthethings\n\n"
             "environment:\n"
-            "  ANTHROPIC_API_KEY     required for -p / --payload"
+            "  ANTHROPIC_API_KEY     required for -p / --payload and --bypass"
         )
     )
     group = parser.add_mutually_exclusive_group(required=True)

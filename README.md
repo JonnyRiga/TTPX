@@ -1,6 +1,6 @@
 # Hacktrix
 
-Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques. Get a clean searchsploit-style table with `-f`, send the findings to Claude for a syntax-highlighted payload with `-p`, or grab a file to your cwd as plain text with `-m`.
+Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques. Get a clean searchsploit-style table with `-f`, send the findings to Claude for a syntax-highlighted payload with `-p`, grab a file to your cwd as plain text with `-m`, or generate a self-contained CSRF PoC HTML file from a raw captured request with `--csrf`.
 
 ## Install
 
@@ -22,7 +22,7 @@ git clone https://github.com/HackTricks-wiki/hacktricks ~/Tools/hacktricks
 git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsallthethings
 ```
 
-**API key** (required for `-p` only):
+**API key** (required for `-p` and `--bypass` only):
 
 ```bash
 echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc && source ~/.zshrc
@@ -38,6 +38,7 @@ hacktrix -u
 hacktrix -f TERM [TERM ...]
 hacktrix -p TERM [TERM ...] [-d CONTEXT [-d CONTEXT ...]] [--no-log]
 hacktrix -m PATH [-s TERM]
+hacktrix --csrf FILE [--bypass]
 ```
 
 ### `-l` / `--list` — browse categories (no terms needed)
@@ -170,6 +171,26 @@ htm "File Inclusion/README.md" -s lfi
 htm "SQL Injection/README.md" -s mysql
 ```
 
+### `--csrf` — generate CSRF PoC (offline)
+
+Parse a raw HTTP request file (copied from Burp Suite or Caido) and generate a self-contained `csrf_poc.html` in the current directory. No API call. PoC type is selected automatically by Content-Type:
+
+| Request | PoC |
+|---|---|
+| GET | `<img src="...">` zero-click tag |
+| POST `application/x-www-form-urlencoded` | Auto-submitting `<form>` with hidden inputs |
+| POST `application/json` | `fetch()` with `credentials: include` + CORS note |
+| POST `multipart/form-data` | `FormData` fetch skeleton (fill fields manually) |
+
+```bash
+hacktrix --csrf req.txt             # generate csrf_poc.html
+hacktrix --csrf req.txt --bypass    # PoC + Claude bypass analysis
+```
+
+`req.txt` is the raw request as copied from Burp/Caido — request line, headers, blank line, body.
+
+`--bypass` calls Claude (requires `ANTHROPIC_API_KEY`) and adds a bypass analysis section: CSRF token detection, Content-Type attack notes, and up to four bypass variant suggestions.
+
 ---
 
 ## Workflow
@@ -201,7 +222,7 @@ If `-p` returns no results, drop a term.
 
 ## Cost
 
-Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `-f` and `-m` are free.
+Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `--csrf --bypass` costs roughly **$0.001** (~100 tokens output). `-f`, `-m`, and `--csrf` (without `--bypass`) are free.
 
 ---
 

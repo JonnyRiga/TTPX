@@ -1,6 +1,6 @@
-.TH HACKTRIX 1 "2026-05-01" "hacktrix" "Security Research Tools"
+.TH HACKTRIX 1 "2026-05-13" "hacktrix" "Security Research Tools"
 .SH NAME
-hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniques
+hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniques; generate CSRF PoC files
 .SH SYNOPSIS
 .B hacktrix
 .B \-l
@@ -37,6 +37,13 @@ hacktrix \- search HackTricks and PayloadsAllTheThings for exploitation techniqu
 .B \-s
 .I TERM
 ]
+.br
+.B hacktrix
+.B \-\-csrf
+.I FILE
+[
+.B \-\-bypass
+]
 .SH DESCRIPTION
 .B hacktrix
 searches local clones of HackTricks and PayloadsAllTheThings (PATT) for
@@ -65,6 +72,26 @@ to copy a file from a
 result to the current directory as plain text with markdown stripped.
 Optionally scope the output to a specific section with
 .BR \-s .
+.PP
+Use
+.B \-\-csrf
+to parse a raw HTTP request file (Burp or Caido format) and generate a
+self-contained CSRF proof-of-concept HTML file
+.RI ( csrf_poc.html )
+in the current directory.
+The PoC type is selected automatically based on the request's Content-Type:
+a form-urlencoded POST becomes an auto-submitting HTML form, a JSON POST
+becomes a
+.B fetch()
+call, a GET becomes an
+.B <img>
+tag, and a multipart POST becomes a FormData skeleton.
+No API call is made by default.
+Add
+.B \-\-bypass
+to send the request metadata to Claude and receive token bypass techniques,
+Content-Type attack notes, and up to four bypass variants with notes on how
+to adapt the generated PoC.
 .SH OPTIONS
 .TP
 .BR \-l ", " \-\-list
@@ -146,11 +173,57 @@ result to
 By default every
 .B \-p
 call appends a timestamped entry (terms, vulnerability, first payload line) to that log.
+.TP
+.BR \-\-csrf " " \fIFILE\fR
+Parse a raw HTTP request file and generate a self-contained CSRF PoC HTML
+file saved as
+.I csrf_poc.html
+in the current directory.
+.I FILE
+should be a plain-text file containing the raw request as copied from Burp
+Suite or Caido (request line, headers, blank line, optional body).
+The PoC type is selected by Content-Type:
+.RS
+.IP \(bu 4
+form-urlencoded \(em auto-submitting HTML
+.B <form>
+with hidden inputs
+.IP \(bu 4
+application/json \(em
+.B fetch()
+call with
+.B credentials: 'include'
+and a CORS note
+.IP \(bu 4
+multipart/form-data \(em
+.B FormData
+.B fetch()
+skeleton (fields must be filled manually)
+.IP \(bu 4
+GET \(em
+.B <img>
+tag for zero-click delivery
+.RE
+.RS
+No API call is made. Field names, values, and the target URL are HTML-escaped
+in the generated output.
+.RE
+.TP
+.BR \-\-bypass
+Optional. Use with
+.B \-\-csrf
+to send the request metadata to Claude and receive a bypass analysis:
+CSRF token detection, Content-Type attack suggestions, and up to four bypass
+variants with PoC adaptation notes.
+Requires
+.BR ANTHROPIC_API_KEY .
 .SH ENVIRONMENT
 .TP
 .B ANTHROPIC_API_KEY
 Required when using
-.BR \-p " / " \-\-payload .
+.BR \-p " / " \-\-payload
+or
+.BR \-\-bypass .
 Obtain from console.anthropic.com.
 .SH FILES
 .TP
@@ -218,6 +291,15 @@ Mirror a specific section only:
 .nf
 htm "Server Side Template Injection/JavaScript.md" \-s handlebars
 htm "File Inclusion/README.md" \-s php
+.fi
+.RE
+.PP
+Generate a CSRF PoC from a captured request:
+.PP
+.RS
+.nf
+hacktrix \-\-csrf req.txt                   # offline PoC, no API cost
+hacktrix \-\-csrf req.txt \-\-bypass          # PoC + Claude bypass analysis
 .fi
 .RE
 .PP
