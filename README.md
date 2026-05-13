@@ -1,6 +1,14 @@
 # Hacktrix
 
-Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques.
+Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques, get AI-generated payloads, and generate CSRF PoCs from raw captured requests — all free, offline-first, and from the CLI.
+
+## Does this already exist?
+
+**The tool as a whole — no.** The closest UX analog is `searchsploit` (same table-style output, same offline-first approach), but it searches Exploit-DB for known CVEs, not technique knowledge bases. Nothing commonly installed combines local HackTricks/PATT search with AI payload generation.
+
+**The CSRF PoC generator — partially.** Burp Suite Pro has a built-in one, and that's what most people reach for. But Burp Pro costs ~$450/year, is GUI-only, and Caido's equivalent is also paid. No widely-used free CLI tool handles all four Content-Type cases (form, JSON, multipart, GET) with HTML injection prevention, offline token detection, and optional AI bypass analysis.
+
+Hacktrix fills that gap.
 
 ## Install
 
