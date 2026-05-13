@@ -195,7 +195,7 @@ Parse a raw HTTP request file (copied from Burp Suite or Caido) and generate a s
 
 | Request | PoC |
 |---|---|
-| GET | `<img src="...">` zero-click tag |
+| GET | Auto-submitting `<form method="GET">` with hidden inputs (SameSite-safe) |
 | POST `application/x-www-form-urlencoded` | Auto-submitting `<form>` with hidden inputs |
 | POST `application/json` | `fetch()` with `credentials: include` + CORS note |
 | POST `multipart/form-data` | `FormData` fetch skeleton (fill fields manually) |

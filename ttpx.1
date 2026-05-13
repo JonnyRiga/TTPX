@@ -83,9 +83,9 @@ The PoC type is selected automatically based on the request's Content-Type:
 a form-urlencoded POST becomes an auto-submitting HTML form, a JSON POST
 becomes a
 .B fetch()
-call, a GET becomes an
-.B <img>
-tag, and a multipart POST becomes a FormData skeleton.
+call, a GET becomes an auto-submitting
+.B <form method="GET">
+with hidden inputs (SameSite\-safe), and a multipart POST becomes a FormData skeleton.
 No API call is made by default.
 After generating the PoC, the request is automatically checked for known
 CSRF token field names (form-encoded and JSON bodies) and headers; a warning
@@ -205,9 +205,9 @@ multipart/form-data \(em
 .B fetch()
 skeleton (fields must be filled manually)
 .IP \(bu 4
-GET \(em
-.B <img>
-tag for zero-click delivery
+GET \(em auto-submitting
+.B <form method="GET">
+with hidden inputs; cookies sent via top-level navigation (SameSite\-safe)
 .RE
 .RS
 No API call is made. Field names, values, and the target URL are HTML-escaped
