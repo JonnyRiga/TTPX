@@ -1,4 +1,4 @@
-# TTPX
+# TTPX — Tactics, Techniques, Payloads & Exploits
 
 Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques, get AI-generated payloads, and generate CSRF PoCs from raw captured requests — all free, offline-first, and from the CLI.
 
