@@ -146,8 +146,7 @@ Copy a file to the current directory as plain text with markdown stripped.
 .I PATH
 is the relative path exactly as shown in a
 .B \-f
-result. Paths with spaces must be quoted. Shell alias:
-.BR htm .
+result. Paths with spaces must be quoted.
 .TP
 .BR \-s ", " \-\-section " " \fITERM\fR
 Optional. Use with
@@ -319,7 +318,7 @@ Mirror a file from a \-f result (full file):
 .PP
 .RS
 .nf
-htm "Server Side Template Injection/JavaScript.md"
+hacktrix \-m "Server Side Template Injection/JavaScript.md"
 .fi
 .RE
 .PP
@@ -327,8 +326,8 @@ Mirror a specific section only:
 .PP
 .RS
 .nf
-htm "Server Side Template Injection/JavaScript.md" \-s handlebars
-htm "File Inclusion/README.md" \-s php
+hacktrix \-m "Server Side Template Injection/JavaScript.md" \-s handlebars
+hacktrix \-m "File Inclusion/README.md" \-s php
 .fi
 .RE
 .PP
@@ -348,7 +347,7 @@ Typical workflow:
 hacktrix \-u                                                        # keep sources current
 hacktrix \-l \-\-since 7d                                             # browse recent updates
 hacktrix \-f ssti handlebars                                        # see what files match
-htm "Server Side Template Injection/JavaScript.md" \-s handlebars   # grab the section
+hacktrix \-m "Server Side Template Injection/JavaScript.md" \-s handlebars  # grab the section
 hacktrix \-p ssti handlebars groovy                                  # generate a payload
 hacktrix \-p ssti handlebars groovy \-d "'require' is not defined"    # adapt after error
 .fi

@@ -155,20 +155,20 @@ Every `-p` call appends a timestamped entry (terms, vulnerability, first payload
 hacktrix -p xss reflected --no-log
 ```
 
-### `-m` / `--mirror` — grab a file to cwd (alias: `htm`)
+### `-m` / `--mirror` — grab a file to cwd
 
 Copy a file from a `-f` result to the current directory as plain text with markdown stripped. Path must match the `-f` output exactly — quote paths with spaces.
 
 ```bash
-htm "Server Side Template Injection/JavaScript.md"          # full file
-htm "Server Side Template Injection/JavaScript.md" -s handlebars  # section only
+hacktrix -m "Server Side Template Injection/JavaScript.md"          # full file
+hacktrix -m "Server Side Template Injection/JavaScript.md" -s handlebars  # section only
 ```
 
 Use `-s` / `--section` to extract just the section whose heading matches the term, stopping at the next heading of equal or higher level. Falls back to the full file if the section isn't found.
 
 ```bash
-htm "File Inclusion/README.md" -s lfi
-htm "SQL Injection/README.md" -s mysql
+hacktrix -m "File Inclusion/README.md" -s lfi
+hacktrix -m "SQL Injection/README.md" -s mysql
 ```
 
 ### `--csrf` — generate CSRF PoC (offline)
@@ -215,7 +215,7 @@ hacktrix -l
 hacktrix -f ssti handlebars
 
 # 3. Grab the relevant section to read offline
-htm "Server Side Template Injection/JavaScript.md" -s handlebars
+hacktrix -m "Server Side Template Injection/JavaScript.md" -s handlebars
 
 # 4. Generate a payload
 hacktrix -p ssti handlebars groovy rce
