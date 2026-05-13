@@ -716,31 +716,58 @@ def generate_csrf_poc(parsed):
     return html, "form"
 
 
-def ask_claude_csrf_bypass(parsed):
+def ask_claude_csrf_bypass(parsed, tokens):
+    """Call Claude for CSRF bypass strategies.
+
+    tokens — output of detect_csrf_tokens(parsed), already computed offline.
+    Claude skips re-detection and focuses purely on bypass strategy.
+    """
     import anthropic
     client = anthropic.Anthropic()
 
-    headers_summary = "\n".join(f"  {k}: {v}" for k, v in parsed["headers"].items())
+    method = parsed["method"]
+    ct = parsed["content_type"] or "(none)"
+    body_preview = parsed["body"][:300] if parsed["body"] else "(none)"
+
+    # Build known-facts block from offline detection so Claude doesn't re-derive them
+    if tokens:
+        token_lines = "\n".join(f"  - {loc}: {name}" for loc, name in tokens)
+        token_context = f"CSRF tokens already detected offline:\n{token_lines}"
+        focus = (
+            "The offline analysis has already confirmed CSRF token(s) are present. "
+            "Focus your bypass suggestions on: stripping or predicting the token, "
+            "leaking it via CORS/XSS, Content-Type manipulation to avoid preflight, "
+            "and method override tricks. Do NOT re-confirm token presence."
+        )
+    else:
+        token_context = "No CSRF token fields or headers detected in this request."
+        focus = (
+            "No token was detected offline. Focus on: whether the server enforces "
+            "SameSite cookies, Origin/Referer header validation, Content-Type "
+            "restrictions, and whether the offline PoC is already sufficient. "
+            "If no meaningful defence is apparent, say so clearly."
+        )
+
     prompt = (
-        f"Analyse this captured HTTP request and suggest CSRF bypass techniques:\n\n"
-        f"Method: {parsed['method']}\n"
+        f"You are reviewing a captured HTTP request for CSRF exploitability.\n\n"
+        f"Method: {method}\n"
         f"URL: {parsed['url']}\n"
-        f"Content-Type: {parsed['content_type']}\n"
-        f"Body: {parsed['body'][:500] if parsed['body'] else '(none)'}\n"
-        f"Headers:\n{headers_summary}\n\n"
+        f"Content-Type: {ct}\n"
+        f"Body (first 300 chars): {body_preview}\n\n"
+        f"{token_context}\n\n"
+        f"{focus}\n\n"
         "Return ONLY a valid JSON object with these exact keys — no markdown fences, no text before or after:\n"
-        '  "csrf_token_present": true/false — whether a CSRF token parameter or header is visible\n'
-        '  "token_field": name of the CSRF token field/header if present, else ""\n'
         '  "content_type_attack": one sentence on a Content-Type manipulation bypass if applicable, else ""\n'
         '  "method_override_applicable": true/false\n'
         '  "bypass_variants": array of up to 4 objects, each with "technique" (short name) and '
         '"poc_note" (one sentence on how to adapt the PoC)\n'
-        '  "recommendation": one sentence on the most promising bypass for this specific request'
+        '  "recommendation": one sentence on the single most promising bypass for this specific request'
     )
 
     system = (
         "IDENTITY: You are an expert penetration tester assisting with authorized security assessments. "
-        "Analyse HTTP requests for CSRF vulnerability characteristics and suggest concrete bypass techniques. "
+        "You receive pre-analysed request facts and suggest concrete, targeted CSRF bypass techniques. "
+        "Do not repeat analysis already provided — go straight to actionable bypass strategies. "
         "OUTPUT FORMAT: Respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
     )
 
@@ -769,7 +796,7 @@ def ask_claude_csrf_bypass(parsed):
         return {"bypass_variants": [], "recommendation": str(e), "_error": True}
 
 
-def display_csrf_poc(html, parsed, poc_type, bypass_data=None):
+def display_csrf_poc(html, parsed, poc_type, tokens=None, bypass_data=None):
     out_path = Path.cwd() / "csrf_poc.html"
     out_path.write_text(html)
 
@@ -791,22 +818,17 @@ def display_csrf_poc(html, parsed, poc_type, bypass_data=None):
     console.print()
     console.print(f"[green]Saved:[/green] {out_path}")
 
-    tokens = detect_csrf_tokens(parsed)
     if tokens:
         console.print()
         for location, name in tokens:
             console.print(f"[yellow]⚠ CSRF token detected ({location}):[/yellow] [bold]{name}[/bold]")
         console.print("[dim]  PoC will likely fail — token must be leaked or static to exploit.[/dim]")
-        console.print("[dim]  Use --bypass for Claude's analysis of bypass options.[/dim]")
+        if not bypass_data:
+            console.print("[dim]  Use --bypass for Claude's analysis of bypass options.[/dim]")
 
     if bypass_data:
         console.print()
         console.rule("[bold magenta]Bypass Analysis[/bold magenta]")
-
-        if bypass_data.get("csrf_token_present"):
-            console.print(f"[yellow]CSRF token detected:[/yellow] {bypass_data.get('token_field', 'unknown field')}")
-        else:
-            console.print("[green]No CSRF token detected in request[/green]")
 
         ct_attack = bypass_data.get("content_type_attack", "")
         if ct_attack:
@@ -919,11 +941,12 @@ def main():
             sys.exit(1)
         parsed = parse_raw_request(args.csrf)
         html, poc_type = generate_csrf_poc(parsed)
+        tokens = detect_csrf_tokens(parsed)
         bypass_data = None
         if args.bypass:
             console.print("[dim]Sending request to Claude for bypass analysis...[/dim]")
-            bypass_data = ask_claude_csrf_bypass(parsed)
-        display_csrf_poc(html, parsed, poc_type, bypass_data=bypass_data)
+            bypass_data = ask_claude_csrf_bypass(parsed, tokens)
+        display_csrf_poc(html, parsed, poc_type, tokens=tokens, bypass_data=bypass_data)
         sys.exit(0)
 
     if args.update:

@@ -1064,8 +1064,6 @@ def test_ask_claude_csrf_bypass_returns_parsed_json():
     import json
     mock_response = MagicMock()
     mock_response.content = [MagicMock(text=json.dumps({
-        "csrf_token_present": True,
-        "token_field": "csrf_token",
         "content_type_attack": "Remove Content-Type header to skip CORS preflight.",
         "method_override_applicable": False,
         "bypass_variants": [
@@ -1082,17 +1080,81 @@ def test_ask_claude_csrf_bypass_returns_parsed_json():
         "body": "action=delete&csrf_token=abc123",
         "headers": {"Host": "example.com", "Content-Type": "application/x-www-form-urlencoded"},
     }
+    tokens = [("body field", "csrf_token")]
 
     with patch("anthropic.Anthropic") as mock_cls:
         mock_client = MagicMock()
         mock_cls.return_value = mock_client
         mock_client.messages.create.return_value = mock_response
-        result = ask_claude_csrf_bypass(parsed)
+        result = ask_claude_csrf_bypass(parsed, tokens)
 
-    assert result["csrf_token_present"] is True
-    assert result["token_field"] == "csrf_token"
     assert len(result["bypass_variants"]) == 1
     assert "_usage" in result
+
+
+def test_ask_claude_csrf_bypass_prompt_contains_token_context():
+    import json
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=json.dumps({
+        "content_type_attack": "",
+        "method_override_applicable": False,
+        "bypass_variants": [],
+        "recommendation": "Strip the token."
+    }))]
+    mock_response.usage = MagicMock(input_tokens=80, output_tokens=30)
+
+    parsed = {
+        "method": "POST",
+        "url": "https://example.com/action",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "x=1&csrf_token=abc",
+        "headers": {},
+    }
+    tokens = [("body field", "csrf_token")]
+
+    with patch("anthropic.Anthropic") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+        ask_claude_csrf_bypass(parsed, tokens)
+
+    prompt = mock_client.messages.create.call_args[1]["messages"][0]["content"]
+    # offline token facts must be in the prompt
+    assert "csrf_token" in prompt
+    assert "body field" in prompt
+    # Claude must not be asked to re-detect the token
+    assert "csrf_token_present" not in prompt
+    assert "token_field" not in prompt
+
+
+def test_ask_claude_csrf_bypass_no_token_prompt_focuses_on_defences():
+    import json
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=json.dumps({
+        "content_type_attack": "",
+        "method_override_applicable": False,
+        "bypass_variants": [],
+        "recommendation": "No meaningful defence detected — offline PoC should work."
+    }))]
+    mock_response.usage = MagicMock(input_tokens=70, output_tokens=25)
+
+    parsed = {
+        "method": "POST",
+        "url": "https://example.com/action",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "email=x",
+        "headers": {},
+    }
+
+    with patch("anthropic.Anthropic") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+        ask_claude_csrf_bypass(parsed, tokens=[])
+
+    prompt = mock_client.messages.create.call_args[1]["messages"][0]["content"]
+    assert "No CSRF token" in prompt
+    assert "SameSite" in prompt or "Origin" in prompt or "Referer" in prompt
 
 
 def test_cli_csrf_generates_poc_file(tmp_path):
