@@ -87,11 +87,17 @@ call, a GET becomes an
 .B <img>
 tag, and a multipart POST becomes a FormData skeleton.
 No API call is made by default.
+After generating the PoC, the request is automatically checked for known
+CSRF token field names (form-encoded and JSON bodies) and headers; a warning
+is printed if any are found.
 Add
 .B \-\-bypass
-to send the request metadata to Claude and receive token bypass techniques,
-Content-Type attack notes, and up to four bypass variants with notes on how
-to adapt the generated PoC.
+to send the request to Claude for targeted bypass analysis.
+The offline token detection results are passed directly into the prompt so
+Claude skips re-detection: if a token was found, it focuses on stripping,
+leakage, and Content-Type manipulation; if none was found, it focuses on
+SameSite enforcement, Origin/Referer validation, and whether the offline
+PoC is already sufficient.
 .SH OPTIONS
 .TP
 .BR \-l ", " \-\-list
@@ -206,17 +212,31 @@ tag for zero-click delivery
 .RE
 .RS
 No API call is made. Field names, values, and the target URL are HTML-escaped
-in the generated output.
+in the generated output. After the PoC is written, the request is
+automatically scanned for known CSRF token field names and headers; a warning
+is printed with the field name, location, and a hint to use
+.B \-\-bypass
+if any are found.
 .RE
 .TP
 .BR \-\-bypass
 Optional. Use with
 .B \-\-csrf
-to send the request metadata to Claude and receive a bypass analysis:
-CSRF token detection, Content-Type attack suggestions, and up to four bypass
-variants with PoC adaptation notes.
+to call Claude for targeted CSRF bypass analysis.
+The offline token detection results are fed into the prompt so Claude goes
+straight to strategy without re-deriving what is already known.
+When a token is present, suggestions focus on stripping or predicting the
+token, leaking it via CORS or XSS, Content-Type manipulation to avoid CORS
+preflight, and method override tricks.
+When no token is detected, suggestions focus on SameSite cookie enforcement,
+Origin/Referer header validation, Content-Type restrictions, and whether the
+generated PoC is already sufficient to exploit the target.
 Requires
 .BR ANTHROPIC_API_KEY .
+Use
+.B \-\-bypass
+when the offline PoC fails and you want to understand what defence is
+blocking it.
 .SH ENVIRONMENT
 .TP
 .B ANTHROPIC_API_KEY

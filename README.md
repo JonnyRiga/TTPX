@@ -189,7 +189,14 @@ hacktrix --csrf req.txt --bypass    # PoC + Claude bypass analysis
 
 `req.txt` is the raw request as copied from Burp/Caido — request line, headers, blank line, body.
 
-`--bypass` calls Claude (requires `ANTHROPIC_API_KEY`) and adds a bypass analysis section: CSRF token detection, Content-Type attack notes, and up to four bypass variant suggestions.
+After generating the PoC, hacktrix automatically checks the request for known CSRF token fields and headers (form-encoded body, JSON body, and request headers) and warns if any are found — no API call required. Covers Django, Rails, ASP.NET, Laravel, WordPress, and common headers (`X-CSRF-Token`, `X-XSRF-Token`, etc.).
+
+`--bypass` calls Claude (requires `ANTHROPIC_API_KEY`) and adds a bypass analysis section. The offline token detection results are fed directly into the prompt so Claude skips re-detection and goes straight to strategy:
+
+- **Token found** → focuses on token stripping/prediction, leakage via CORS/XSS, Content-Type manipulation, method override
+- **No token found** → focuses on SameSite enforcement, Origin/Referer validation, Content-Type restrictions, and whether the offline PoC is already sufficient
+
+Use `--bypass` when the offline PoC fails and you want Claude's read on what's blocking it.
 
 ---
 
