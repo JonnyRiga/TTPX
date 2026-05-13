@@ -9,6 +9,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-13] — CSRF scheme detection fix
+
+### Fixed
+- `--csrf` was generating `https://` URLs when the `Host` header had no explicit
+  port (e.g. `Host: 10.1.100.55`), producing broken PoCs against plain-HTTP
+  targets. Default is now `http://`; only `:443` in the Host header produces
+  `https://`. All other explicit ports continue to produce `http://`.
+
+---
+
 ## [2026-05-13] — Licensing, legal disclaimer, and repo hygiene
 
 ### Added
