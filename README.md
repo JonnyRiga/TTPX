@@ -1,6 +1,6 @@
 # Hacktrix
 
-Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques. Get a clean searchsploit-style table with `-f`, send the findings to Claude for a syntax-highlighted payload with `-p`, grab a file to your cwd as plain text with `-m`, or generate a self-contained CSRF PoC HTML file from a raw captured request with `--csrf`.
+Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques.
 
 ## Install
 
