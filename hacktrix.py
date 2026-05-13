@@ -740,7 +740,11 @@ def ask_claude_csrf_bypass(parsed, tokens):
             "and method override tricks. Do NOT re-confirm token presence."
         )
     else:
-        token_context = "No CSRF token fields or headers detected in this request."
+        token_context = (
+            "No CSRF token fields or headers detected in this request. "
+            "Note: cookie-based CSRF tokens (e.g. XSRF-TOKEN double-submit) were not checked — "
+            "they may still be present."
+        )
         focus = (
             "No token was detected offline. Focus on: whether the server enforces "
             "SameSite cookies, Origin/Referer header validation, Content-Type "

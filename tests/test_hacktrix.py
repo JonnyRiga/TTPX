@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass, detect_csrf_tokens
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass, detect_csrf_tokens, display_csrf_poc
 from unittest.mock import patch, MagicMock
 
 
@@ -1125,6 +1125,8 @@ def test_ask_claude_csrf_bypass_prompt_contains_token_context():
     # Claude must not be asked to re-detect the token
     assert "csrf_token_present" not in prompt
     assert "token_field" not in prompt
+    # focus instruction must steer towards specific bypass families
+    assert "stripping" in prompt or "leaking" in prompt or "manipulation" in prompt.lower()
 
 
 def test_ask_claude_csrf_bypass_no_token_prompt_focuses_on_defences():
@@ -1368,6 +1370,47 @@ def test_cli_csrf_warns_on_token_detection(tmp_path):
     assert result.returncode == 0
     assert "csrf_token" in result.stdout
     assert "token" in result.stdout.lower()
+
+
+def test_display_csrf_poc_suppresses_bypass_hint_when_bypass_active(monkeypatch, tmp_path):
+    import io
+    import hacktrix
+    from rich.console import Console as RichConsole
+    buf = io.StringIO()
+    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.chdir(tmp_path)
+    parsed = {
+        "method": "POST", "url": "https://example.com/x",
+        "content_type": "application/x-www-form-urlencoded", "body": "",
+        "headers": {},
+    }
+    bypass_data = {
+        "content_type_attack": "", "method_override_applicable": False,
+        "bypass_variants": [], "recommendation": "test rec",
+    }
+    display_csrf_poc("<html/>", parsed, "form",
+                     tokens=[("body field", "csrf_token")], bypass_data=bypass_data)
+    out = buf.getvalue()
+    assert "csrf_token" in out       # token warning still shown
+    assert "--bypass" not in out     # hint suppressed when bypass already active
+
+
+def test_display_csrf_poc_shows_bypass_hint_without_bypass(monkeypatch, tmp_path):
+    import io
+    import hacktrix
+    from rich.console import Console as RichConsole
+    buf = io.StringIO()
+    monkeypatch.setattr(hacktrix, "console", RichConsole(file=buf, highlight=False))
+    monkeypatch.chdir(tmp_path)
+    parsed = {
+        "method": "POST", "url": "https://example.com/x",
+        "content_type": "application/x-www-form-urlencoded", "body": "",
+        "headers": {},
+    }
+    display_csrf_poc("<html/>", parsed, "form", tokens=[("body field", "csrf_token")])
+    out = buf.getvalue()
+    assert "csrf_token" in out
+    assert "--bypass" in out         # hint shown when bypass not active
 
 
 def test_log_payload_result_silent_on_error(tmp_path, monkeypatch):
