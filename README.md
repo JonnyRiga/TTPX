@@ -6,7 +6,7 @@ Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [Payloads
 
 ## Why this exists
 
-TTPX brings together features that normally require multiple paid tools into a single free CLI workflow.
+TTPX brings together features that normally require paid tools into a single free CLI workflow.
 
 The closest comparison overall is SearchSploit — same offline-first, terminal-based feel — but SearchSploit only indexes Exploit-DB CVEs. TTPX goes further by searching local HackTricks/PATT knowledge bases and supporting AI-assisted payload generation.
 
