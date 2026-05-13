@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass
 from unittest.mock import patch, MagicMock
 
 
@@ -539,7 +539,7 @@ def test_ask_claude_includes_changes_field_when_details_given():
     call_kwargs = mock_client.messages.create.call_args[1]
     prompt = call_kwargs["messages"][0]["content"]
     assert '"changes"' in prompt
-    assert "bullet" in prompt.lower()
+    assert "one change per line" in prompt.lower()
     assert result["changes"] == "- Replaced require() with process.mainModule.require()"
 
 
@@ -779,6 +779,283 @@ def test_log_payload_result_appends_not_overwrites(tmp_path, monkeypatch):
     content = log_path.read_text()
     assert "existing entry" in content
     assert "XSS" in content
+
+
+# CSRF PoC tests
+
+def _write_req(tmp_path, content):
+    f = tmp_path / "req.txt"
+    f.write_text(content)
+    return str(f)
+
+
+def test_parse_raw_request_form_post(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /account/change-email HTTP/1.1\r\n"
+        "Host: example.com\r\n"
+        "Content-Type: application/x-www-form-urlencoded\r\n"
+        "\r\n"
+        "email=attacker%40evil.com&confirm=attacker%40evil.com"
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["method"] == "POST"
+    assert parsed["url"] == "https://example.com/account/change-email"
+    assert parsed["content_type"] == "application/x-www-form-urlencoded"
+    assert "email=attacker" in parsed["body"]
+
+
+def test_parse_raw_request_json_post(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api/update HTTP/1.1\n"
+        "Host: api.example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        '{"username":"admin","role":"superuser"}'
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["method"] == "POST"
+    assert "application/json" in parsed["content_type"]
+    assert '"username"' in parsed["body"]
+
+
+def test_parse_raw_request_get(tmp_path):
+    req = _write_req(tmp_path, (
+        "GET /admin/delete?id=5 HTTP/1.1\n"
+        "Host: example.com\n"
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["method"] == "GET"
+    assert parsed["url"] == "https://example.com/admin/delete?id=5"
+    assert parsed["body"] == ""
+
+
+def test_parse_raw_request_http_scheme_on_port_80(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /login HTTP/1.1\n"
+        "Host: example.com:80\n"
+        "\n"
+        "user=x"
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["url"].startswith("http://")
+
+
+def test_parse_raw_request_https_scheme_on_port_443(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /login HTTP/1.1\n"
+        "Host: example.com:443\n"
+        "\n"
+        "user=x"
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["url"].startswith("https://")
+
+
+def test_parse_raw_request_http_scheme_on_nonstandard_port(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /login HTTP/1.1\n"
+        "Host: 10.10.10.10:8080\n"
+        "\n"
+        "user=x"
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["url"].startswith("http://")
+
+
+def test_parse_raw_request_https_default_no_port(tmp_path):
+    req = _write_req(tmp_path, (
+        "GET /profile HTTP/1.1\n"
+        "Host: example.com\n"
+    ))
+    parsed = parse_raw_request(req)
+    assert parsed["url"].startswith("https://")
+
+
+def test_generate_csrf_poc_escapes_html_in_field_values(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /update HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        'name="><script>alert(1)</script>&token=abc'
+    ))
+    parsed = parse_raw_request(req)
+    html, _ = generate_csrf_poc(parsed)
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html or "&#x27;" in html or "&gt;" in html
+
+
+def test_generate_csrf_poc_escapes_url_in_form_action(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /update HTTP/1.1\n"
+        'Host: example.com\n'
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "x=1"
+    ))
+    parsed = parse_raw_request(req)
+    # Manually inject a URL with quotes to verify escaping
+    parsed["url"] = 'https://example.com/path?a="onmouseover=alert(1)'
+    html, _ = generate_csrf_poc(parsed)
+    assert '"onmouseover=alert(1)' not in html
+
+
+def test_parse_raw_request_missing_file():
+    with pytest.raises(SystemExit):
+        parse_raw_request("/nonexistent/req.txt")
+
+
+def test_parse_raw_request_empty_file(tmp_path):
+    f = tmp_path / "req.txt"
+    f.write_text("")
+    with pytest.raises(SystemExit):
+        parse_raw_request(str(f))
+
+
+def test_generate_csrf_poc_form_post(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /change-email HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "email=evil%40attacker.com&csrf_token=abc"
+    ))
+    parsed = parse_raw_request(req)
+    html, poc_type = generate_csrf_poc(parsed)
+    assert poc_type == "form"
+    assert 'action="https://example.com/change-email"' in html
+    assert 'method="POST"' in html
+    assert 'name="email"' in html
+    assert 'csrf-form' in html
+    assert 'submit()' in html
+
+
+def test_generate_csrf_poc_json_post(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api/settings HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        '{"admin":true}'
+    ))
+    parsed = parse_raw_request(req)
+    html, poc_type = generate_csrf_poc(parsed)
+    assert poc_type == "json"
+    assert "fetch(" in html
+    assert "credentials: 'include'" in html
+    assert "application/json" in html
+    assert "CORS preflight" in html
+
+
+def test_generate_csrf_poc_get(tmp_path):
+    req = _write_req(tmp_path, (
+        "GET /admin/reset?user=5 HTTP/1.1\n"
+        "Host: example.com\n"
+    ))
+    parsed = parse_raw_request(req)
+    html, poc_type = generate_csrf_poc(parsed)
+    assert poc_type == "get"
+    assert "<img" in html
+    assert "https://example.com/admin/reset?user=5" in html
+
+
+def test_generate_csrf_poc_multipart(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /upload HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: multipart/form-data; boundary=----abc\n"
+        "\n"
+        "------abc\r\nContent-Disposition: form-data; name=\"file\"\r\n\r\ndata\r\n------abc--"
+    ))
+    parsed = parse_raw_request(req)
+    html, poc_type = generate_csrf_poc(parsed)
+    assert poc_type == "multipart"
+    assert "FormData" in html
+    assert "fetch(" in html
+
+
+def test_generate_csrf_poc_no_body_form(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "\n"
+    ))
+    parsed = parse_raw_request(req)
+    html, poc_type = generate_csrf_poc(parsed)
+    assert poc_type == "form"
+    assert 'method="POST"' in html
+
+
+def test_ask_claude_csrf_bypass_returns_parsed_json():
+    import json
+    mock_response = MagicMock()
+    mock_response.content = [MagicMock(text=json.dumps({
+        "csrf_token_present": True,
+        "token_field": "csrf_token",
+        "content_type_attack": "Remove Content-Type header to skip CORS preflight.",
+        "method_override_applicable": False,
+        "bypass_variants": [
+            {"technique": "Token removal", "poc_note": "Drop the csrf_token field entirely."},
+        ],
+        "recommendation": "Try removing the csrf_token parameter — server may not validate it."
+    }))]
+    mock_response.usage = MagicMock(input_tokens=100, output_tokens=50)
+
+    parsed = {
+        "method": "POST",
+        "url": "https://example.com/action",
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "action=delete&csrf_token=abc123",
+        "headers": {"Host": "example.com", "Content-Type": "application/x-www-form-urlencoded"},
+    }
+
+    with patch("anthropic.Anthropic") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create.return_value = mock_response
+        result = ask_claude_csrf_bypass(parsed)
+
+    assert result["csrf_token_present"] is True
+    assert result["token_field"] == "csrf_token"
+    assert len(result["bypass_variants"]) == 1
+    assert "_usage" in result
+
+
+def test_cli_csrf_generates_poc_file(tmp_path):
+    req = tmp_path / "req.txt"
+    req.write_text(
+        "POST /change-email HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "email=evil%40attacker.com"
+    )
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "--csrf", str(req)],
+        capture_output=True, text=True, cwd=str(tmp_path)
+    )
+    assert result.returncode == 0
+    assert (tmp_path / "csrf_poc.html").exists()
+    content = (tmp_path / "csrf_poc.html").read_text()
+    assert "csrf-form" in content
+
+
+def test_cli_csrf_bypass_without_api_key(tmp_path):
+    req = tmp_path / "req.txt"
+    req.write_text(
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "\n"
+        "x=1"
+    )
+    env = os.environ.copy()
+    env.pop("ANTHROPIC_API_KEY", None)
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "--csrf", str(req), "--bypass"],
+        capture_output=True, text=True, env=env, cwd=str(tmp_path)
+    )
+    assert result.returncode != 0
+    assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
 
 
 def test_log_payload_result_silent_on_error(tmp_path, monkeypatch):
