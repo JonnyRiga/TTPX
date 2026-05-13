@@ -921,8 +921,8 @@ def main():
             "environment:\n"
             "  ANTHROPIC_API_KEY     required for -p / --payload and --bypass\n\n"
             "legal:\n"
-            "  For authorised security testing and research only.\n"
-            "  Only use against systems you own or have explicit permission to test."
+            "  TTPX makes no network connections to any target.\n"
+            "  You are responsible for how you use the output."
         )
     )
     group = parser.add_mutually_exclusive_group(required=True)
