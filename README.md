@@ -4,7 +4,11 @@ Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [Payloads
 
 ## Why this exists
 
-CSRF PoC generation is a paid feature in Burp Suite Pro (~$450/yr) and Caido. Searching HackTricks and PayloadsAllTheThings for technique-matched payloads and piping the results to an AI isn't something any free tool does. Hacktrix is the free, CLI version of both.
+Hacktrix brings together features that normally require multiple paid tools into a single free CLI workflow.
+
+The closest comparison overall is SearchSploit — same offline-first, terminal-based feel — but SearchSploit only indexes Exploit-DB CVEs. Hacktrix goes further by searching local HackTricks/PATT knowledge bases and supporting AI-assisted payload generation.
+
+Its CSRF PoC generator also replaces functionality usually locked behind paid platforms like Burp Suite Pro or Caido. Unlike those GUI-only tools, Hacktrix is free, CLI-based, and supports all major request types (form, JSON, multipart, and GET), along with HTML injection prevention, offline token detection, and optional AI-powered bypass analysis.
 
 ## Install
 
