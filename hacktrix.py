@@ -569,29 +569,39 @@ def parse_raw_request(file_path):
 _CSRF_TOKEN_FIELDS = {
     "csrf_token", "csrftoken", "_csrf", "_csrf_token", "csrf",
     "authenticity_token", "__requestverificationtoken", "requestverificationtoken",
-    "_token", "token", "xsrf_token", "csrfmiddlewaretoken", "ant-csrf-token",
-    "_wpnonce", "nonce",
+    "_token", "xsrf_token", "csrfmiddlewaretoken", "ant-csrf-token",
+    "_wpnonce",
+    # "token" and "nonce" intentionally omitted — too generic, high false-positive
+    # rate with OAuth flows, payment APIs, and invitation links.
 }
 
 _CSRF_TOKEN_HEADERS = {
     "x-csrf-token", "x-xsrf-token", "x-csrftoken", "x-request-token",
-    "x-requested-with", "x-ant-csrf-token",
+    "x-ant-csrf-token",
+    # "x-requested-with" intentionally omitted — it is a same-origin hint, not a
+    # secret token; flagging it as a CSRF token would be misleading.
 }
 
 
 def detect_csrf_tokens(parsed):
-    """Return list of (location, name) tuples for any detected CSRF token fields/headers."""
+    """Return list of (location, name) tuples for any detected CSRF token fields/headers.
+
+    Known limitations:
+    - Only top-level JSON keys are checked; nested tokens (e.g. data.csrf_token) are not detected.
+    - multipart/form-data body fields are not parsed.
+    - Cookie-based CSRF tokens (e.g. XSRF-TOKEN cookie) are out of scope.
+    """
     found = []
     ct = parsed["content_type"].lower()
     body = parsed["body"]
 
-    # Form-encoded body
-    if "application/x-www-form-urlencoded" in ct or (body and "=" in body and "&" in body):
+    # Form-encoded body — also attempt heuristic parse when Content-Type is absent
+    if "application/x-www-form-urlencoded" in ct or (body and "=" in body):
         for name, _ in parse_qsl(body, keep_blank_values=True):
             if name.lower() in _CSRF_TOKEN_FIELDS:
                 found.append(("body field", name))
 
-    # JSON body
+    # JSON body — top-level keys only
     if "application/json" in ct and body:
         try:
             obj = json.loads(body)

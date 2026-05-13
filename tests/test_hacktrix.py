@@ -1199,6 +1199,71 @@ def test_detect_csrf_tokens_returns_empty_when_none(tmp_path):
     assert detect_csrf_tokens(parsed) == []
 
 
+def test_detect_csrf_tokens_single_field_no_content_type(tmp_path):
+    # Single field body with no Content-Type header — heuristic must still detect
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "\n"
+        "csrf_token=abc123"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "csrf_token" for _, name in found)
+
+
+def test_detect_csrf_tokens_header_case_insensitive(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "x-csrf-token: abc123\n"
+        "Content-Type: application/json\n"
+        "\n"
+        "{}"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "x-csrf-token" for _, name in found)
+
+
+def test_detect_csrf_tokens_get_with_header_only(tmp_path):
+    req = _write_req(tmp_path, (
+        "GET /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "X-CSRF-Token: abc123\n"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "X-CSRF-Token" for _, name in found)
+
+
+def test_detect_csrf_tokens_no_false_positive_on_token_field(tmp_path):
+    # bare "token" field was removed from the list — must not trigger
+    req = _write_req(tmp_path, (
+        "POST /oauth HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "token=bearer_abc&grant_type=authorization_code"
+    ))
+    parsed = parse_raw_request(req)
+    assert detect_csrf_tokens(parsed) == []
+
+
+def test_detect_csrf_tokens_no_false_positive_on_x_requested_with(tmp_path):
+    # x-requested-with is a same-origin hint, not a CSRF token — must not trigger
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "X-Requested-With: XMLHttpRequest\n"
+        "Content-Type: application/json\n"
+        "\n"
+        "{}"
+    ))
+    parsed = parse_raw_request(req)
+    assert detect_csrf_tokens(parsed) == []
+
+
 def test_detect_csrf_tokens_case_insensitive_field(tmp_path):
     req = _write_req(tmp_path, (
         "POST /action HTTP/1.1\n"
