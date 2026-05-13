@@ -10,6 +10,8 @@ The closest comparison overall is SearchSploit — same offline-first, terminal-
 
 Its CSRF PoC generator also replaces functionality usually locked behind paid platforms like Burp Suite Pro or Caido. Unlike those GUI-only tools, Hacktrix is free, CLI-based, and supports all major request types (form, JSON, multipart, and GET), along with HTML injection prevention, offline token detection, and optional AI-powered bypass analysis.
 
+The only cost is if the user chooses to connect a Claude API key for AI payload generation — everything else works fully offline and free out of the box.
+
 ## Install
 
 ```bash
