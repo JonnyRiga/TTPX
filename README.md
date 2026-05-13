@@ -40,6 +40,12 @@ git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsal
 echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc && source ~/.zshrc
 ```
 
+**Man page** (optional):
+
+```bash
+sudo cp ttpx.1 /usr/local/man/man1/ttpx.1 && sudo mandb
+```
+
 ---
 
 ## Usage
