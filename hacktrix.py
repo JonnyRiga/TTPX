@@ -568,7 +568,13 @@ def parse_raw_request(file_path):
 
 def _js_escape(s):
     """Escape a string for safe embedding inside a JS single-quoted string literal."""
-    return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r")
+    return (
+        s.replace("\\", "\\\\")
+         .replace("'", "\\'")
+         .replace("/", "\\/")   # prevent </script> breakout in inline script blocks
+         .replace("\n", "\\n")
+         .replace("\r", "\\r")
+    )
 
 
 def generate_csrf_poc(parsed):
@@ -595,9 +601,10 @@ def generate_csrf_poc(parsed):
 
     if "application/json" in ct:
         try:
-            body_repr = json.dumps(json.loads(body))
+            # replace "</" with "<\/" so </script> can't break out of the script block
+            body_repr = json.dumps(json.loads(body)).replace("</", "<\\/")
         except (json.JSONDecodeError, ValueError):
-            body_repr = body.replace("\\", "\\\\").replace("'", "\\'")
+            body_repr = f"'{_js_escape(body)}'"
         html = (
             "<html>\n"
             "  <body>\n"
@@ -607,7 +614,7 @@ def generate_csrf_poc(parsed):
             "        credentials: 'include',\n"
             "        headers: {'Content-Type': 'application/json'},\n"
             f"        body: JSON.stringify({body_repr})\n"
-            "      }});\n"
+            "      });\n"
             "    </script>\n"
             "    <!-- Note: Content-Type: application/json triggers CORS preflight.\n"
             "         Only works if the server has a CORS misconfiguration.\n"
@@ -629,7 +636,7 @@ def generate_csrf_poc(parsed):
             f"        method: '{safe_method_js}',\n"
             "        credentials: 'include',\n"
             "        body: form\n"
-            "      }});\n"
+            "      });\n"
             "    </script>\n"
             "  </body>\n"
             "</html>"

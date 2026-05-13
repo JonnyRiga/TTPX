@@ -974,6 +974,80 @@ def test_generate_csrf_poc_multipart(tmp_path):
     assert "fetch(" in html
 
 
+def test_generate_csrf_poc_json_fetch_syntax_valid(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api/settings HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        '{"admin":true}'
+    ))
+    parsed = parse_raw_request(req)
+    html, _ = generate_csrf_poc(parsed)
+    # fetch call must close with }); not }});
+    assert "});" in html
+    assert "}});" not in html
+
+
+def test_generate_csrf_poc_multipart_fetch_syntax_valid(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /upload HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: multipart/form-data; boundary=----abc\n"
+        "\n"
+        "data"
+    ))
+    parsed = parse_raw_request(req)
+    html, _ = generate_csrf_poc(parsed)
+    assert "});" in html
+    assert "}});" not in html
+
+
+def test_generate_csrf_poc_json_invalid_body_is_quoted(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        "not valid json"
+    ))
+    parsed = parse_raw_request(req)
+    html, _ = generate_csrf_poc(parsed)
+    # fallback body must be quoted, not a bare JS expression
+    assert "JSON.stringify('not valid json')" in html or "JSON.stringify('" in html
+    # must not be unquoted
+    assert "JSON.stringify(not valid json)" not in html
+
+
+def test_js_escape_prevents_script_tag_breakout_via_url(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        "{}"
+    ))
+    parsed = parse_raw_request(req)
+    parsed["url"] = "https://example.com/</script><script>alert(1)//"
+    html, _ = generate_csrf_poc(parsed)
+    # raw </script> must appear exactly once — only the legitimate closing tag
+    assert html.count("</script>") == 1
+
+
+def test_js_escape_prevents_script_tag_breakout_via_json_body(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        '{"url":"https://evil.com/</script><script>alert(1)//"}'
+    ))
+    parsed = parse_raw_request(req)
+    html, _ = generate_csrf_poc(parsed)
+    # json.dumps must not embed a raw </script> that would close the script block
+    assert html.count("</script>") == 1
+
+
 def test_generate_csrf_poc_no_body_form(tmp_path):
     req = _write_req(tmp_path, (
         "POST /action HTTP/1.1\n"
