@@ -241,6 +241,12 @@ If `-p` returns no results, drop a term.
 
 ---
 
+## Legal
+
+TTPX is intended for authorised security testing, research, and education only. Only use it against systems you own or have explicit written permission to test. Unauthorised use against systems you do not have permission to access is illegal and unethical. The authors accept no liability for misuse.
+
+---
+
 ## Cost
 
 Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `--csrf --bypass` costs roughly **$0.001–$0.002** (~200–400 tokens output). `-f`, `-m`, and `--csrf` (without `--bypass`) are free.

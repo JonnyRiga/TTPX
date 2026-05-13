@@ -919,7 +919,10 @@ def main():
             "  HackTricks:           ~/Tools/hacktricks\n"
             "  PayloadsAllTheThings: ~/Tools/payloadsallthethings\n\n"
             "environment:\n"
-            "  ANTHROPIC_API_KEY     required for -p / --payload and --bypass"
+            "  ANTHROPIC_API_KEY     required for -p / --payload and --bypass\n\n"
+            "legal:\n"
+            "  For authorised security testing and research only.\n"
+            "  Only use against systems you own or have explicit permission to test."
         )
     )
     group = parser.add_mutually_exclusive_group(required=True)
