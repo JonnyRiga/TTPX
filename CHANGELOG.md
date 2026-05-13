@@ -9,6 +9,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-13] — CSRF token detection
+
+### Added
+- Offline CSRF token detection in `--csrf`: after generating the PoC, hacktrix
+  checks the request for known CSRF token field names (form-encoded and JSON bodies)
+  and headers, and warns immediately if any are found — no API call required.
+  Covers common frameworks: Django (`csrfmiddlewaretoken`), Rails (`authenticity_token`),
+  ASP.NET (`__RequestVerificationToken`), Laravel (`_token`), WordPress (`_wpnonce`),
+  and standard headers (`X-CSRF-Token`, `X-XSRF-Token`, etc.).
+  Warning includes the field/header name, location, and a hint to use `--bypass`.
+
+### Fixed
+- `token` and `nonce` removed from the token field list — too generic, produced
+  false positives on OAuth bearer token fields and payment nonce fields.
+- `X-Requested-With` removed from the token header list — it is a same-origin hint,
+  not a secret CSRF token; flagging it as one was misleading.
+- Single-field form body (`csrf_token=abc` with no `&`) was silently missed when
+  the `Content-Type` header was absent. Fixed by dropping the `&` requirement from
+  the heuristic.
+
+---
+
 ## [2026-05-13] — CSRF PoC generation
 
 ### Added
