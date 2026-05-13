@@ -12,7 +12,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [2026-05-13] — Rename: hacktrix → ttpx
 
 ### Changed
-- Tool renamed from `hacktrix` to `ttpx` (Tactics, Techniques, Procedures + x).
+- Tool renamed from `hacktrix` to `ttpx` (Tactics, Techniques, Payloads & Exploits).
 - `hacktrix.py` → `ttpx.py`, `hacktrix.1` → `ttpx.1`, `test_hacktrix.py` → `test_ttpx.py`.
 - Symlink updated: `/usr/local/bin/ttpx → ~/Tools/ttpx.py`.
 - Session log renamed: `hacktrix-session.log` → `ttpx-session.log`.
