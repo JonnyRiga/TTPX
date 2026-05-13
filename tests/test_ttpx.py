@@ -955,8 +955,11 @@ def test_generate_csrf_poc_get(tmp_path):
     parsed = parse_raw_request(req)
     html, poc_type = generate_csrf_poc(parsed)
     assert poc_type == "get"
-    assert "<img" in html
-    assert "http://example.com/admin/reset?user=5" in html
+    assert '<form' in html
+    assert 'method="GET"' in html
+    assert 'action="http://example.com/admin/reset"' in html
+    assert 'name="user" value="5"' in html
+    assert "csrf" in html  # auto-submit script
 
 
 def test_generate_csrf_poc_html5_boilerplate(tmp_path):

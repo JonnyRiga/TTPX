@@ -10,7 +10,7 @@ TTPX brings together features that normally require multiple paid tools into a s
 
 The closest comparison overall is SearchSploit — same offline-first, terminal-based feel — but SearchSploit only indexes Exploit-DB CVEs. TTPX goes further by searching local HackTricks/PATT knowledge bases and supporting AI-assisted payload generation.
 
-Its CSRF PoC generator also replaces functionality usually locked behind paid platforms like Burp Suite Pro or Caido. Unlike those GUI-only tools, TTPX is free, CLI-based, and supports all major request types (form, JSON, multipart, and GET), along with HTML injection prevention, offline token detection, and optional AI-powered bypass analysis.
+Its CSRF PoC generator covers functionality usually locked behind paid platforms like Burp Suite Pro or Caido — and matches free tools like csrfshark — while staying fully CLI-based and offline-first. Supports all major request types (form, JSON, multipart, and GET), with HTML injection prevention, offline token detection, and optional AI-powered bypass analysis.
 
 The only cost is if the user chooses to connect a Claude API key for AI payload generation — everything else works fully offline and free out of the box.
 
