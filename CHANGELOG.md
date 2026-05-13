@@ -9,6 +9,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-13] — Licensing, legal disclaimer, and repo hygiene
+
+### Added
+- GPL v3 license (`LICENSE` file, SPDX header in `ttpx.py`, badge in README).
+- Legal disclaimer added to README (`## Legal`), `--help` epilog, and man page
+  (`LEGAL` section) — accurately reflects the tool's passive nature: no network
+  connections to targets; user is responsible for how output is applied.
+- TTPX expansion documented as "Tactics, Techniques, Payloads & Exploits" in
+  README title, man page NAME section, and `ttpx.py` header comment.
+
+### Fixed
+- Compiled `.pyc` files (`tests/__pycache__/`) untracked from public repo —
+  `.gitignore` patterns were present but do not retroactively untrack already-
+  committed files.
+- CHANGELOG rename entry corrected: "Procedures + x" → "Payloads & Exploits".
+
+---
+
 ## [2026-05-13] — Rename: hacktrix → ttpx
 
 ### Changed
