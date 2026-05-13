@@ -217,6 +217,24 @@ automatically scanned for known CSRF token field names and headers; a warning
 is printed with the field name, location, and a hint to use
 .B \-\-bypass
 if any are found.
+Detection covers form-encoded bodies, top-level JSON keys, and request headers.
+The heuristic also fires on form-encoded bodies when the
+.B Content-Type
+header is absent, as long as
+.B =
+is present in the body.
+Common frameworks detected include Django, Rails, ASP.NET, Laravel, WordPress,
+and Ant Design; headers checked include
+.BR X-CSRF-Token ,
+.BR X-XSRF-Token ,
+.BR X-CSRFToken ,
+.BR X-Request-Token ,
+and
+.BR X-Ant-CSRF-Token .
+.PP
+.B Note:
+tokens in nested JSON objects, multipart fields, and cookies are not detected.
+A clean warning does not guarantee the endpoint has no CSRF protection.
 .RE
 .TP
 .BR \-\-bypass
@@ -346,6 +364,17 @@ Each
 .B \-p
 call costs approximately $0.001\(en$0.005 in Claude API credits
 (claude\-sonnet\-4\-6, ~200\(en500 tokens output).
+Each
+.B \-\-bypass
+call costs approximately $0.001\(en$0.002
+(~200\(en400 tokens output).
+.B \-f ,
+.B \-m ,
+and
+.B \-\-csrf
+without
+.B \-\-bypass
+are free.
 .SH SEE ALSO
 .BR searchsploit (1),
 .BR msfconsole (1)

@@ -189,7 +189,9 @@ hacktrix --csrf req.txt --bypass    # PoC + Claude bypass analysis
 
 `req.txt` is the raw request as copied from Burp/Caido — request line, headers, blank line, body.
 
-After generating the PoC, hacktrix automatically checks the request for known CSRF token fields and headers (form-encoded body, JSON body, and request headers) and warns if any are found — no API call required. Covers Django, Rails, ASP.NET, Laravel, WordPress, and common headers (`X-CSRF-Token`, `X-XSRF-Token`, etc.).
+After generating the PoC, hacktrix automatically checks the request for known CSRF token fields and headers (form-encoded body, JSON body, and request headers) and warns if any are found — no API call required. Covers common frameworks including Django, Rails, ASP.NET, Laravel, WordPress, and Ant Design, plus several common headers (`X-CSRF-Token`, `X-XSRF-Token`, `X-CSRFToken`, `X-Request-Token`, `X-Ant-CSRF-Token`). The heuristic also fires on form-encoded bodies when the `Content-Type` header is absent, as long as `=` is present in the body.
+
+> **Detection limits:** Tokens in nested JSON objects, multipart fields, and cookies are not detected. A clean warning does not guarantee the endpoint has no CSRF protection.
 
 `--bypass` calls Claude (requires `ANTHROPIC_API_KEY`) and adds a bypass analysis section. The offline token detection results are fed directly into the prompt so Claude skips re-detection and goes straight to strategy:
 
@@ -229,7 +231,7 @@ If `-p` returns no results, drop a term.
 
 ## Cost
 
-Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `--csrf --bypass` costs roughly **$0.001** (~100 tokens output). `-f`, `-m`, and `--csrf` (without `--bypass`) are free.
+Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `--csrf --bypass` costs roughly **$0.001–$0.002** (~200–400 tokens output). `-f`, `-m`, and `--csrf` (without `--bypass`) are free.
 
 ---
 

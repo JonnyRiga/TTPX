@@ -9,6 +9,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-13] — Doc accuracy pass
+
+### Fixed
+- README and man page: framework/header coverage list now accurate — added Ant Design,
+  listed all five headers explicitly (`X-CSRF-Token`, `X-XSRF-Token`, `X-CSRFToken`,
+  `X-Request-Token`, `X-Ant-CSRF-Token`), removed overstated Laravel-specificity claim.
+- README and man page: heuristic fallback now documented — detection fires on
+  form-encoded bodies even when `Content-Type` is absent, as long as `=` is in the body.
+- README and man page: known detection limits now documented — nested JSON, multipart
+  fields, and cookie-based tokens are not detected; a clean warning does not guarantee
+  no CSRF protection.
+- README and man page: `--bypass` cost estimate corrected from ~100 to ~200–400 tokens
+  output ($0.001–$0.002 per call).
+
+---
+
 ## [2026-05-13] — --bypass optimisation
 
 ### Changed
