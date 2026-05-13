@@ -17,7 +17,7 @@ The only cost is if the user chooses to connect a Claude API key for AI payload 
 ## Install
 
 ```bash
-git clone https://github.com/JonnyRiga/ttpx ~/Tools/ttpx-repo
+git clone https://github.com/JonnyRiga/TTPX ~/Tools/ttpx-repo
 # tool lives at ~/Tools/ttpx.py, symlinked to /usr/local/bin/ttpx
 ```
 
