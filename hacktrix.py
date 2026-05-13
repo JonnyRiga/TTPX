@@ -566,6 +566,50 @@ def parse_raw_request(file_path):
     }
 
 
+_CSRF_TOKEN_FIELDS = {
+    "csrf_token", "csrftoken", "_csrf", "_csrf_token", "csrf",
+    "authenticity_token", "__requestverificationtoken", "requestverificationtoken",
+    "_token", "token", "xsrf_token", "csrfmiddlewaretoken", "ant-csrf-token",
+    "_wpnonce", "nonce",
+}
+
+_CSRF_TOKEN_HEADERS = {
+    "x-csrf-token", "x-xsrf-token", "x-csrftoken", "x-request-token",
+    "x-requested-with", "x-ant-csrf-token",
+}
+
+
+def detect_csrf_tokens(parsed):
+    """Return list of (location, name) tuples for any detected CSRF token fields/headers."""
+    found = []
+    ct = parsed["content_type"].lower()
+    body = parsed["body"]
+
+    # Form-encoded body
+    if "application/x-www-form-urlencoded" in ct or (body and "=" in body and "&" in body):
+        for name, _ in parse_qsl(body, keep_blank_values=True):
+            if name.lower() in _CSRF_TOKEN_FIELDS:
+                found.append(("body field", name))
+
+    # JSON body
+    if "application/json" in ct and body:
+        try:
+            obj = json.loads(body)
+            if isinstance(obj, dict):
+                for key in obj:
+                    if key.lower() in _CSRF_TOKEN_FIELDS:
+                        found.append(("JSON field", key))
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Request headers
+    for header in parsed["headers"]:
+        if header.lower() in _CSRF_TOKEN_HEADERS:
+            found.append(("header", header))
+
+    return found
+
+
 def _js_escape(s):
     """Escape a string for safe embedding inside a JS single-quoted string literal."""
     return (
@@ -736,6 +780,14 @@ def display_csrf_poc(html, parsed, poc_type, bypass_data=None):
     console.print(escape(html), soft_wrap=True)
     console.print()
     console.print(f"[green]Saved:[/green] {out_path}")
+
+    tokens = detect_csrf_tokens(parsed)
+    if tokens:
+        console.print()
+        for location, name in tokens:
+            console.print(f"[yellow]⚠ CSRF token detected ({location}):[/yellow] [bold]{name}[/bold]")
+        console.print("[dim]  PoC will likely fail — token must be leaked or static to exploit.[/dim]")
+        console.print("[dim]  Use --bypass for Claude's analysis of bypass options.[/dim]")
 
     if bypass_data:
         console.print()

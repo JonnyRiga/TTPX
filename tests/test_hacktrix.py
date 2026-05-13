@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 sys.path.insert(0, str(Path.home() / "Tools"))
 
-from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass
+from hacktrix import extract_snippet, extract_title, find_matches, ask_claude, source_label, strip_markdown, extract_section, mirror_file, log_payload_result, _content_root, _recently_changed_dirs, HACKTRICKS_PATH, PATT_PATH, MAX_PAYLOAD_MATCHES, parse_raw_request, generate_csrf_poc, ask_claude_csrf_bypass, detect_csrf_tokens
 from unittest.mock import patch, MagicMock
 
 
@@ -1130,6 +1130,117 @@ def test_cli_csrf_bypass_without_api_key(tmp_path):
     )
     assert result.returncode != 0
     assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
+
+
+# CSRF token detection tests
+
+def test_detect_csrf_tokens_finds_form_field(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "email=x&csrf_token=abc123"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "csrf_token" for _, name in found)
+
+
+def test_detect_csrf_tokens_finds_authenticity_token(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "authenticity_token=xyz&data=1"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "authenticity_token" for _, name in found)
+
+
+def test_detect_csrf_tokens_finds_json_field(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/json\n"
+        "\n"
+        '{"_csrf":"tok123","admin":true}'
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "_csrf" for _, name in found)
+
+
+def test_detect_csrf_tokens_finds_header(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /api HTTP/1.1\n"
+        "Host: example.com\n"
+        "X-CSRF-Token: abc123\n"
+        "Content-Type: application/json\n"
+        "\n"
+        "{}"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "X-CSRF-Token" for _, name in found)
+
+
+def test_detect_csrf_tokens_returns_empty_when_none(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "email=x&confirm=x"
+    ))
+    parsed = parse_raw_request(req)
+    assert detect_csrf_tokens(parsed) == []
+
+
+def test_detect_csrf_tokens_case_insensitive_field(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "CSRF_TOKEN=abc&data=1"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "CSRF_TOKEN" for _, name in found)
+
+
+def test_detect_csrf_tokens_requestverificationtoken(tmp_path):
+    req = _write_req(tmp_path, (
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "__RequestVerificationToken=abc&data=1"
+    ))
+    parsed = parse_raw_request(req)
+    found = detect_csrf_tokens(parsed)
+    assert any(name == "__RequestVerificationToken" for _, name in found)
+
+
+def test_cli_csrf_warns_on_token_detection(tmp_path):
+    req = tmp_path / "req.txt"
+    req.write_text(
+        "POST /action HTTP/1.1\n"
+        "Host: example.com\n"
+        "Content-Type: application/x-www-form-urlencoded\n"
+        "\n"
+        "data=x&csrf_token=abc123"
+    )
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "hacktrix.py"), "--csrf", str(req)],
+        capture_output=True, text=True, cwd=str(tmp_path)
+    )
+    assert result.returncode == 0
+    assert "csrf_token" in result.stdout
+    assert "token" in result.stdout.lower()
 
 
 def test_log_payload_result_silent_on_error(tmp_path, monkeypatch):
