@@ -1570,3 +1570,68 @@ def test_log_script_result_silent_on_error(tmp_path, monkeypatch):
     monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
     data = {"vulnerabilities": [], "weaponization_strategy": "x"}
     log_script_result("foo.sh", [], data)  # must not raise
+
+
+# --script: display_script_result tests
+
+def test_display_script_result_writes_weaponized_file(tmp_path, monkeypatch):
+    import io, ttpx
+    from rich.console import Console as RichConsole
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=io.StringIO(), highlight=False))
+    data = {
+        "vulnerabilities": [
+            {"name": "Wildcard injection", "severity": "critical", "line": 5,
+             "detail": "tar * is exploitable."}
+        ],
+        "exploitation": "Plant checkpoint files in the backup dir.",
+        "weaponization_strategy": "adds SUID to /bin/bash",
+        "language": "bash",
+        "weaponized_script": "#!/bin/bash\nchmod u+s /bin/bash\n",
+        "_usage": {"input_tokens": 100, "output_tokens": 50},
+    }
+    out_path = tmp_path / "weaponized_backup.sh"
+    display_script_result(data, out_path)
+    assert out_path.exists()
+    assert out_path.read_text() == "#!/bin/bash\nchmod u+s /bin/bash\n"
+
+
+def test_display_script_result_shows_vulns_in_output(tmp_path, monkeypatch):
+    import io, ttpx
+    from rich.console import Console as RichConsole
+    buf = io.StringIO()
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    data = {
+        "vulnerabilities": [
+            {"name": "PATH hijack", "severity": "high", "line": None,
+             "detail": "PATH is user-controlled."}
+        ],
+        "exploitation": "Drop a malicious binary named cp in /tmp and prepend /tmp to PATH.",
+        "weaponization_strategy": "writes reverse shell as cp in /tmp",
+        "language": "bash",
+        "weaponized_script": "#!/bin/bash\necho payload > /tmp/cp\n",
+    }
+    out_path = tmp_path / "weaponized_deploy.sh"
+    display_script_result(data, out_path)
+    output = buf.getvalue()
+    assert "PATH hijack" in output
+    assert "HIGH" in output
+    assert "writes reverse shell" in output
+
+
+def test_display_script_result_handles_empty_vulns(tmp_path, monkeypatch):
+    import io, ttpx
+    from rich.console import Console as RichConsole
+    buf = io.StringIO()
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=buf, highlight=False))
+    data = {
+        "vulnerabilities": [],
+        "exploitation": "",
+        "weaponization_strategy": "adds cron entry",
+        "language": "bash",
+        "weaponized_script": "#!/bin/bash\ncrontab -l | { cat; echo '* * * * * /tmp/rs'; } | crontab -\n",
+    }
+    out_path = tmp_path / "weaponized_monitor.sh"
+    display_script_result(data, out_path)
+    output = buf.getvalue()
+    assert "No vulnerabilities identified" in output
+    assert out_path.exists()

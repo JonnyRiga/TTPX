@@ -259,6 +259,14 @@ LANGUAGE_LABELS = {
     "xml": "XML",
 }
 
+SEVERITY_STYLES = {
+    "critical": "bold red",
+    "high": "red",
+    "medium": "yellow",
+    "low": "green",
+    "info": "dim",
+}
+
 
 def display_payload_result(data, sources):
     lang = data.get("language", "text")
@@ -974,9 +982,48 @@ def ask_claude_script(script_content, filename, details=None):
         }
 
 
-def display_script_result(result, filename):
-    """Placeholder — implemented in Task 3."""
-    pass
+def display_script_result(data, out_path):
+    console.print()
+    console.rule("[bold red]Script Analysis[/bold red]")
+    console.print(f"[bold]File:[/bold] {out_path.name.replace('weaponized_', '', 1)}\n")
+
+    vulns = data.get("vulnerabilities", [])
+    if vulns:
+        for v in vulns:
+            sev = v.get("severity", "info").lower()
+            style = SEVERITY_STYLES.get(sev, "white")
+            label = f"[{sev.upper()}]"
+            line_info = f" (line {v['line']})" if v.get("line") else ""
+            console.print(f"[{style}]{label}[/{style}] {escape(v.get('name', ''))}{line_info}")
+            if v.get("detail"):
+                console.print(f"       [dim]{escape(v['detail'])}[/dim]")
+    else:
+        console.print("[dim]No vulnerabilities identified.[/dim]")
+
+    exploitation = data.get("exploitation", "")
+    if exploitation:
+        console.print()
+        console.rule("[bold cyan]Exploitation[/bold cyan]", align="left")
+        console.print(exploitation)
+
+    strategy = data.get("weaponization_strategy", "")
+    if strategy:
+        console.print()
+        console.print(f"[bold]Weaponization:[/bold] {escape(strategy)}")
+
+    weaponized = data.get("weaponized_script", "")
+    if weaponized:
+        out_path.write_text(weaponized)
+        console.print()
+        console.print(f"[green]Saved:[/green] {out_path}")
+
+    usage = data.get("_usage")
+    if usage:
+        inp, out_tok = usage["input_tokens"], usage["output_tokens"]
+        cost = (inp * 3 + out_tok * 15) / 1_000_000
+        console.print(f"\n[dim]Tokens: {inp:,} in / {out_tok:,} out  ·  est. ${cost:.4f}  (Sonnet 4.6)[/dim]")
+
+    console.rule()
 
 
 def log_script_result(filename, details, data):
