@@ -980,8 +980,28 @@ def display_script_result(result, filename):
 
 
 def log_script_result(filename, details, data):
-    """Placeholder — implemented in Task 2."""
-    pass
+    try:
+        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M")
+        vulns = data.get("vulnerabilities", [])
+        vuln_summary = (
+            ", ".join(
+                f"{v.get('name', '?')} [{v.get('severity', '?').upper()}]"
+                for v in vulns
+            )
+            if vulns else "none identified"
+        )
+        context_line = f"  context: {' | '.join(details)}\n" if details else ""
+        entry = (
+            f"[{ts}] --script {filename}\n"
+            f"{context_line}"
+            f"  vulns: {vuln_summary}\n"
+            f"  weaponization: {data.get('weaponization_strategy', '')}\n\n"
+        )
+        with LOG_PATH.open("a") as f:
+            f.write(entry)
+    except Exception:
+        pass
 
 
 def main():

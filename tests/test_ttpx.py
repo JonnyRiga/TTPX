@@ -1512,3 +1512,52 @@ def test_log_payload_result_silent_on_error(tmp_path, monkeypatch):
     monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
     data = {"vulnerability": "X", "payload": "p", "recommendation": "r"}
     log_payload_result(["x"], data)  # must not raise
+
+
+# --script: log_script_result tests
+
+def test_log_script_result_writes_to_log(tmp_path, monkeypatch):
+    import ttpx
+    log_path = tmp_path / "ttpx-session.log"
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
+    data = {
+        "vulnerabilities": [
+            {"name": "Wildcard injection in tar", "severity": "critical"},
+            {"name": "Hardcoded credential", "severity": "high"},
+        ],
+        "weaponization_strategy": "adds SUID to /bin/bash on execution",
+    }
+    log_script_result("backup.sh", ["runs as root via cronjob", "world-writable"], data)
+    content = log_path.read_text()
+    assert "--script backup.sh" in content
+    assert "runs as root via cronjob" in content
+    assert "world-writable" in content
+    assert "Wildcard injection in tar [CRITICAL]" in content
+    assert "Hardcoded credential [HIGH]" in content
+    assert "adds SUID to /bin/bash on execution" in content
+
+
+def test_log_script_result_appends_not_overwrites(tmp_path, monkeypatch):
+    import ttpx
+    log_path = tmp_path / "ttpx-session.log"
+    log_path.write_text("existing entry\n\n")
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
+    data = {"vulnerabilities": [], "weaponization_strategy": "adds cron entry"}
+    log_script_result("monitor.sh", [], data)
+    content = log_path.read_text()
+    assert "existing entry" in content
+    assert "--script monitor.sh" in content
+
+
+def test_log_script_result_no_context_line_when_no_details(tmp_path, monkeypatch):
+    import ttpx
+    log_path = tmp_path / "ttpx-session.log"
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
+    data = {
+        "vulnerabilities": [{"name": "PATH hijack", "severity": "high"}],
+        "weaponization_strategy": "adds malicious binary to PATH",
+    }
+    log_script_result("deploy.sh", [], data)
+    content = log_path.read_text()
+    assert "context:" not in content
+    assert "PATH hijack [HIGH]" in content
