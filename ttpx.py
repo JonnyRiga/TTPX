@@ -241,6 +241,8 @@ def ask_claude(matches, terms, details=None):
         }
 
 
+_SCRIPT_LANG_MAP = {".py": "python", ".ps1": "powershell", ".rb": "ruby", ".pl": "perl"}
+
 LANGUAGE_LABELS = {
     "bash": "Bash",
     "groovy": "Groovy",
@@ -901,7 +903,7 @@ def ask_claude_script(script_content, filename, details=None):
     import anthropic
     client = anthropic.Anthropic()
 
-    lang_hint = "python" if str(filename).endswith(".py") else "bash"
+    lang_hint = _SCRIPT_LANG_MAP.get(Path(filename).suffix.lower(), "bash")
 
     context_block = ""
     if details:
@@ -924,7 +926,7 @@ def ask_claude_script(script_content, filename, details=None):
         '("critical"/"high"/"medium"/"low"/"info"), "line" (integer or null), "detail" (one sentence)\n'
         '  "exploitation": paragraph explaining how to exploit without touching the script\n'
         '  "weaponization_strategy": one sentence describing what the modified script does\n'
-        '  "language": "bash" or "python" or "text"\n'
+        '  "language": "bash", "python", "powershell", "ruby", "perl", or "text"\n'
         '  "weaponized_script": the complete modified script as a string'
     )
 
@@ -977,7 +979,7 @@ def display_script_result(result, filename):
     pass
 
 
-def log_script_result(filename, result):
+def log_script_result(filename, details, data):
     """Placeholder — implemented in Task 2."""
     pass
 
