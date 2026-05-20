@@ -1561,3 +1561,12 @@ def test_log_script_result_no_context_line_when_no_details(tmp_path, monkeypatch
     content = log_path.read_text()
     assert "context:" not in content
     assert "PATH hijack [HIGH]" in content
+
+
+def test_log_script_result_silent_on_error(tmp_path, monkeypatch):
+    import ttpx
+    log_path = tmp_path / "ttpx-session.log"
+    log_path.mkdir()  # make it a directory so open("a") raises
+    monkeypatch.setattr(ttpx, "LOG_PATH", log_path)
+    data = {"vulnerabilities": [], "weaponization_strategy": "x"}
+    log_script_result("foo.sh", [], data)  # must not raise

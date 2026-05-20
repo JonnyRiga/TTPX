@@ -996,7 +996,7 @@ def log_script_result(filename, details, data):
             f"[{ts}] --script {filename}\n"
             f"{context_line}"
             f"  vulns: {vuln_summary}\n"
-            f"  weaponization: {data.get('weaponization_strategy', '')}\n\n"
+            f"  weaponization: {data.get('weaponization_strategy') or 'n/a'}\n\n"
         )
         with LOG_PATH.open("a") as f:
             f.write(entry)
