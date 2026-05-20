@@ -241,7 +241,7 @@ def ask_claude(matches, terms, details=None):
         }
 
 
-_SCRIPT_LANG_MAP = {".py": "python", ".ps1": "powershell", ".rb": "ruby", ".pl": "perl"}
+SCRIPT_LANG_MAP = {".sh": "bash", ".py": "python", ".ps1": "powershell", ".rb": "ruby", ".pl": "perl"}
 
 LANGUAGE_LABELS = {
     "bash": "Bash",
@@ -911,7 +911,7 @@ def ask_claude_script(script_content, filename, details=None):
     import anthropic
     client = anthropic.Anthropic()
 
-    lang_hint = _SCRIPT_LANG_MAP.get(Path(filename).suffix.lower(), "bash")
+    lang_hint = SCRIPT_LANG_MAP.get(Path(filename).suffix.lower(), "bash")
 
     context_block = ""
     if details:
@@ -949,11 +949,13 @@ def ask_claude_script(script_content, filename, details=None):
     try:
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=4096,
+            max_tokens=8192,
             system=system,
             messages=[{"role": "user", "content": prompt}]
         )
         raw = response.content[0].text.strip()
+        if response.stop_reason == "max_tokens":
+            console.print("[yellow]Warning: Claude response was truncated — weaponized script may be incomplete.[/yellow]")
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start != -1 and end > start:
@@ -1017,8 +1019,11 @@ def display_script_result(data, out_path):
         console.print()
         console.print("[bold cyan]Weaponized script[/bold cyan] [dim](preview)[/dim]")
         console.print(Syntax(weaponized, lang, theme="monokai", line_numbers=True, padding=(1, 2)))
-        out_path.write_text(weaponized)
-        console.print(f"[green]Saved:[/green] {out_path}")
+        try:
+            out_path.write_text(weaponized)
+            console.print(f"[green]Saved:[/green] {out_path}")
+        except OSError as e:
+            console.print(f"[red]Failed to write {out_path}: {e}[/red]")
 
     usage = data.get("_usage")
     if usage:

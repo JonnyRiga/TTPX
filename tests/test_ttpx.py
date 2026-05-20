@@ -1174,7 +1174,7 @@ def test_ask_claude_script_returns_parsed_json():
     assert "_usage" in result
     call_kwargs = mock_client.messages.create.call_args[1]
     assert call_kwargs["model"] == "claude-sonnet-4-6"
-    assert call_kwargs["max_tokens"] == 4096
+    assert call_kwargs["max_tokens"] == 8192
 
 
 def test_ask_claude_script_includes_details_in_prompt():
