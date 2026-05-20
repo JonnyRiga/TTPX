@@ -9,6 +9,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2026-05-20] — Script vulnerability analysis (`--script`)
+
+### Added
+- `--script FILE` mode: send a shell or Python script found on a target to Claude for vulnerability analysis. Claude identifies exploitable weaknesses (wildcard injection, PATH hijack, hardcoded credentials, etc.), explains how to exploit them without modifying the script, and writes a weaponized drop-in replacement to `weaponized_<filename>` in cwd.
+- Supports `.sh`, `.py`, `.ps1`, `.rb`, `.pl` — warns and proceeds for other extensions.
+- Use `-d` to supply context that shapes weaponization: `"runs as root via cronjob"`, `"world-writable"`, `"owned by www-data"`, etc. Repeatable.
+- Severity-coloured vulnerability table (CRITICAL/HIGH/MEDIUM/LOW/INFO) with per-vuln line numbers and detail sentences.
+- Syntax-highlighted weaponized script preview in terminal (monokai, line numbers) before writing to file.
+- Session log entry written to `~/Tools/ttpx-session.log` (suppress with `--no-log`): includes filename, context strings, vuln summary, and weaponization strategy.
+- `SCRIPT_LANG_MAP` and `SEVERITY_STYLES` module-level constants.
+- 18 new tests (unit + CLI integration), 118 total.
+
+---
+
 ## [2026-05-13] — CSRF scheme detection fix
 
 ### Fixed

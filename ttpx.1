@@ -1,6 +1,6 @@
-.TH TTPX 1 "2026-05-13" "ttpx" "Security Research Tools"
+.TH TTPX 1 "2026-05-20" "ttpx" "Security Research Tools"
 .SH NAME
-ttpx \- Tactics, Techniques, Payloads & Exploits \(em search HackTricks and PayloadsAllTheThings for exploitation techniques; generate CSRF PoC files
+ttpx \- Tactics, Techniques, Payloads & Exploits \(em search HackTricks and PayloadsAllTheThings for exploitation techniques; generate CSRF PoC files; analyse target scripts for vulnerabilities
 .SH SYNOPSIS
 .B ttpx
 .B \-l
@@ -43,6 +43,14 @@ ttpx \- Tactics, Techniques, Payloads & Exploits \(em search HackTricks and Payl
 .I FILE
 [
 .B \-\-bypass
+]
+.br
+.B ttpx
+.B \-\-script
+.I FILE
+[
+.B \-d
+.I CONTEXT
 ]
 .SH DESCRIPTION
 .B ttpx
@@ -93,6 +101,17 @@ is printed if any are found.
 Add
 .B \-\-bypass
 to send the request to Claude for targeted bypass analysis.
+.PP
+Use
+.B \-\-script
+to send a shell or Python script found on a target machine to Claude for vulnerability analysis.
+Claude identifies exploitable weaknesses, explains how to exploit them without modifying the original file,
+and produces a weaponized drop-in replacement saved as
+.RI weaponized_< filename >
+in the current directory.
+Pass
+.B \-d
+to provide context about how the script runs (e.g. "runs as root via cronjob").
 The offline token detection results are passed directly into the prompt so
 Claude skips re-detection: if a token was found, it focuses on stripping,
 leakage, and Content-Type manipulation; if none was found, it focuses on
@@ -173,11 +192,15 @@ Only meaningful with
 .BR \-\-no\-log
 Skip auto\-logging this
 .B \-p
+or
+.B \-\-script
 result to
 .IR ~/Tools/ttpx-session.log .
 By default every
 .B \-p
-call appends a timestamped entry (terms, vulnerability, first payload line) to that log.
+and
+.B \-\-script
+call appends a timestamped entry to that log.
 .TP
 .BR \-\-csrf " " \fIFILE\fR
 Parse a raw HTTP request file and generate a self-contained CSRF PoC HTML
@@ -236,6 +259,30 @@ tokens in nested JSON objects, multipart fields, and cookies are not detected.
 A clean warning does not guarantee the endpoint has no CSRF protection.
 .RE
 .TP
+.BR \-\-script " " \fIFILE\fR
+Send a shell or Python script to Claude for vulnerability analysis.
+.I FILE
+is any script file on disk — typically one found on a target machine.
+Claude identifies exploitable weaknesses, explains how to exploit the most impactful one without
+touching the original file, and produces a complete weaponized drop-in replacement.
+The replacement is saved as
+.RI weaponized_< filename >
+in the current directory and previewed with syntax highlighting in the terminal.
+.PP
+Supported extensions: .sh, .py, .ps1, .rb, .pl.
+Any other extension triggers a warning but proceeds.
+.PP
+Use
+.B \-d
+to supply context that shapes weaponization, e.g.
+.IR "\-d \(dqruns as root via cronjob\(dq" .
+Repeat
+.B \-d
+for multiple context strings.
+.PP
+Requires
+.BR ANTHROPIC_API_KEY .
+.TP
 .BR \-\-bypass
 Optional. Use with
 .B \-\-csrf
@@ -258,9 +305,10 @@ blocking it.
 .TP
 .B ANTHROPIC_API_KEY
 Required when using
-.BR \-p " / " \-\-payload
+.BR \-p " / " \-\-payload ,
+.BR \-\-bypass ,
 or
-.BR \-\-bypass .
+.BR \-\-script .
 Obtain from console.anthropic.com.
 .SH FILES
 .TP
@@ -340,6 +388,16 @@ ttpx \-\-csrf req.txt \-\-bypass          # PoC + Claude bypass analysis
 .fi
 .RE
 .PP
+Analyse a script found on a target machine:
+.PP
+.RS
+.nf
+ttpx \-\-script /tmp/backup.sh \-d "runs as root via cronjob"
+ttpx \-\-script /opt/cleanup.py \-d "owned by www-data" \-d "cron every minute"
+ttpx \-\-script monitor.sh             # no context, Claude infers from content
+.fi
+.RE
+.PP
 Typical workflow:
 .PP
 .RS
@@ -367,6 +425,10 @@ Each
 .B \-\-bypass
 call costs approximately $0.001\(en$0.002
 (~200\(en400 tokens output).
+Each
+.B \-\-script
+call costs approximately $0.005\(en$0.02
+depending on script size (~500\(en2000 tokens input and output).
 .B \-f ,
 .B \-m ,
 and

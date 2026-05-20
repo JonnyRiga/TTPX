@@ -2,7 +2,7 @@
 
 ![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)
 
-Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques, get AI-generated payloads, and generate CSRF PoCs from raw captured requests — all free, offline-first, and from the CLI.
+Search [HackTricks](https://github.com/HackTricks-wiki/hacktricks) and [PayloadsAllTheThings](https://github.com/swisskyrepo/PayloadsAllTheThings) for exploitation techniques, get AI-generated payloads, generate CSRF PoCs from raw captured requests, and analyse scripts found on target machines for exploitable vulnerabilities — all free, offline-first, and from the CLI.
 
 ## Why this exists
 
@@ -34,7 +34,7 @@ git clone https://github.com/HackTricks-wiki/hacktricks ~/Tools/hacktricks
 git clone https://github.com/swisskyrepo/PayloadsAllTheThings ~/Tools/payloadsallthethings
 ```
 
-**API key** (required for `-p` and `--bypass` only):
+**API key** (required for `-p`, `--bypass`, and `--script`):
 
 ```bash
 echo 'export ANTHROPIC_API_KEY="sk-ant-..."' >> ~/.zshrc && source ~/.zshrc
@@ -57,6 +57,7 @@ ttpx -f TERM [TERM ...]
 ttpx -p TERM [TERM ...] [-d CONTEXT [-d CONTEXT ...]] [--no-log]
 ttpx -m PATH [-s TERM]
 ttpx --csrf FILE [--bypass]
+ttpx --script FILE [-d CONTEXT [-d CONTEXT ...]] [--no-log]
 ```
 
 ### `-l` / `--list` — browse categories (no terms needed)
@@ -167,10 +168,11 @@ ttpx -p lfi php -d "../etc/passwd filtered, got 403" -d "double-encoded also blo
 
 ### `--no-log` — skip session logging
 
-Every `-p` call appends a timestamped entry (terms, vulnerability, first payload line) to `~/Tools/ttpx-session.log`. Pass `--no-log` to suppress it for a specific call.
+Every `-p` and `--script` call appends a timestamped entry to `~/Tools/ttpx-session.log`. Pass `--no-log` to suppress it for a specific call.
 
 ```bash
 ttpx -p xss reflected --no-log
+ttpx --script backup.sh -d "runs as root" --no-log
 ```
 
 ### `-m` / `--mirror` — grab a file to cwd
@@ -218,6 +220,44 @@ After generating the PoC, ttpx automatically checks the request for known CSRF t
 
 Use `--bypass` when the offline PoC fails and you want Claude's read on what's blocking it.
 
+### `--script` — analyse a script found on target (Claude)
+
+Send a shell or Python script to Claude with optional context about how it runs (owner, cron schedule, permissions). Claude identifies exploitable vulnerabilities, explains how to exploit them without touching the script, and writes a weaponized drop-in replacement to `weaponized_<filename>` in cwd.
+
+```bash
+ttpx --script /tmp/backup.sh -d "runs as root via cronjob" -d "world-writable"
+ttpx --script /opt/app/cleanup.py -d "owned by www-data, cron runs every minute"
+ttpx --script monitor.sh          # no context — Claude infers from content alone
+```
+
+Supports `.sh`, `.py`, `.ps1`, `.rb`, `.pl` — warns and proceeds for anything else. Requires `ANTHROPIC_API_KEY`.
+
+Output includes a severity-coloured vulnerability table (CRITICAL/HIGH/MEDIUM/LOW), an exploitation walkthrough, a syntax-highlighted preview of the weaponized script, and the saved file path.
+
+```
+ Script Analysis: backup.sh
+ ────────────────────────────────────────────────
+ [CRITICAL] Wildcard injection in tar (line 2)
+            tar czf /tmp/backup.tar.gz * — checkpoint file injection
+ [HIGH]     Hardcoded credential (line 8)
+            DB_PASS=s3cr3t leaked in plaintext
+
+ Exploitation
+ ─────────────
+ Since the cron job runs as root every minute, drop a file named
+ --checkpoint-action=exec=sh${IFS}revshell.sh in the backup directory...
+
+ Weaponization: adds SUID to /bin/bash on execution
+
+ ── Weaponized script (preview) ──
+ #!/bin/bash
+ chmod u+s /bin/bash
+
+ Saved: /home/user/weaponized_backup.sh
+```
+
+Use `-d` to provide context that shapes the weaponization — the more specific, the more targeted the output.
+
 ---
 
 ## Workflow
@@ -255,7 +295,7 @@ TTPX is a research and reference tool — it searches local knowledge bases and 
 
 ## Cost
 
-Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `--csrf --bypass` costs roughly **$0.001–$0.002** (~200–400 tokens output). `-f`, `-m`, and `--csrf` (without `--bypass`) are free.
+Each `-p` call costs roughly **$0.001–$0.005** (claude-sonnet-4-6, ~200–500 tokens output). `--csrf --bypass` costs roughly **$0.001–$0.002** (~200–400 tokens output). `--script` costs roughly **$0.005–$0.02** depending on script size (~500–2000 tokens input + output for the weaponized replacement). `-f`, `-m`, and `--csrf` (without `--bypass`) are free.
 
 ---
 
