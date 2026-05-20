@@ -1148,13 +1148,14 @@ def main():
             sys.exit(1)
         if script_path.suffix.lower() not in {".sh", ".py"}:
             console.print(f"[yellow]Warning: {script_path.name} is not a .sh or .py file — proceeding anyway.[/yellow]")
-        script_content = script_path.read_text()
+        script_content = script_path.read_text(errors="ignore")
+        clean_name = script_path.name.removeprefix("weaponized_")
         console.print("[dim]Sending script to Claude for analysis...[/dim]")
-        data = ask_claude_script(script_content, script_path.name, details=args.details)
-        out_path = Path.cwd() / f"weaponized_{script_path.name}"
+        data = ask_claude_script(script_content, clean_name, details=args.details)
+        out_path = Path.cwd() / f"weaponized_{clean_name}"
         display_script_result(data, out_path)
         if not args.no_log:
-            log_script_result(script_path.name, args.details or [], data)
+            log_script_result(clean_name, args.details or [], data)
         sys.exit(0)
 
     if args.update:
