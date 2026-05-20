@@ -993,7 +993,7 @@ def display_script_result(data, out_path):
             sev = v.get("severity", "info").lower()
             style = SEVERITY_STYLES.get(sev, "white")
             label = f"[{sev.upper()}]"
-            line_info = f" (line {v['line']})" if v.get("line") else ""
+            line_info = f" (line {escape(str(v['line']))})" if v.get("line") else ""
             console.print(f"[{style}]{label}[/{style}] {escape(v.get('name', ''))}{line_info}")
             if v.get("detail"):
                 console.print(f"       [dim]{escape(v['detail'])}[/dim]")
@@ -1004,7 +1004,7 @@ def display_script_result(data, out_path):
     if exploitation:
         console.print()
         console.rule("[bold cyan]Exploitation[/bold cyan]", align="left")
-        console.print(exploitation)
+        console.print(escape(exploitation))
 
     strategy = data.get("weaponization_strategy", "")
     if strategy:
@@ -1013,8 +1013,11 @@ def display_script_result(data, out_path):
 
     weaponized = data.get("weaponized_script", "")
     if weaponized:
-        out_path.write_text(weaponized)
+        lang = data.get("language", "bash")
         console.print()
+        console.print("[bold cyan]Weaponized script[/bold cyan] [dim](preview)[/dim]")
+        console.print(Syntax(weaponized, lang, theme="monokai", line_numbers=True, padding=(1, 2)))
+        out_path.write_text(weaponized)
         console.print(f"[green]Saved:[/green] {out_path}")
 
     usage = data.get("_usage")

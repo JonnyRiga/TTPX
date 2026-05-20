@@ -1635,3 +1635,19 @@ def test_display_script_result_handles_empty_vulns(tmp_path, monkeypatch):
     output = buf.getvalue()
     assert "No vulnerabilities identified" in output
     assert out_path.exists()
+
+
+def test_display_script_result_no_file_when_empty_script(tmp_path, monkeypatch):
+    import io, ttpx
+    from rich.console import Console as RichConsole
+    monkeypatch.setattr(ttpx, "console", RichConsole(file=io.StringIO(), highlight=False))
+    data = {
+        "vulnerabilities": [],
+        "exploitation": "",
+        "weaponization_strategy": "",
+        "language": "text",
+        "weaponized_script": "",
+    }
+    out_path = tmp_path / "weaponized_test.sh"
+    display_script_result(data, out_path)
+    assert not out_path.exists()
