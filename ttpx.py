@@ -1104,6 +1104,8 @@ def main():
                        help="git pull both knowledge bases and print a change summary")
     group.add_argument("--csrf", metavar="FILE",
                        help="generate a CSRF PoC from a raw HTTP request file (Burp/Caido format); saved to csrf_poc.html")
+    group.add_argument("--script", metavar="FILE",
+                       help="analyse a .sh or .py script for vulnerabilities and write a weaponized version to weaponized_<filename> (requires ANTHROPIC_API_KEY)")
     parser.add_argument("-d", "--details", metavar="CONTEXT", action="append",
                         help="error output or context from a previous -p attempt; repeat for multi-turn chaining")
     parser.add_argument("-s", "--section", metavar="TERM",
@@ -1134,6 +1136,25 @@ def main():
             console.print("[dim]Sending request to Claude for bypass analysis...[/dim]")
             bypass_data = ask_claude_csrf_bypass(parsed, tokens)
         display_csrf_poc(html, parsed, poc_type, tokens=tokens, bypass_data=bypass_data)
+        sys.exit(0)
+
+    if args.script:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            console.print("[red]Set ANTHROPIC_API_KEY to use --script[/red]")
+            sys.exit(1)
+        script_path = Path(args.script)
+        if not script_path.exists():
+            console.print(f"[red]File not found: {args.script}[/red]")
+            sys.exit(1)
+        if script_path.suffix.lower() not in {".sh", ".py"}:
+            console.print(f"[yellow]Warning: {script_path.name} is not a .sh or .py file — proceeding anyway.[/yellow]")
+        script_content = script_path.read_text()
+        console.print("[dim]Sending script to Claude for analysis...[/dim]")
+        data = ask_claude_script(script_content, script_path.name, details=args.details)
+        out_path = Path.cwd() / f"weaponized_{script_path.name}"
+        display_script_result(data, out_path)
+        if not args.no_log:
+            log_script_result(script_path.name, args.details or [], data)
         sys.exit(0)
 
     if args.update:

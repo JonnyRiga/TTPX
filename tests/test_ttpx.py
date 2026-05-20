@@ -1651,3 +1651,84 @@ def test_display_script_result_no_file_when_empty_script(tmp_path, monkeypatch):
     out_path = tmp_path / "weaponized_test.sh"
     display_script_result(data, out_path)
     assert not out_path.exists()
+
+
+# --script: CLI integration tests
+
+def test_cli_script_without_api_key(tmp_path):
+    script = tmp_path / "backup.sh"
+    script.write_text("#!/bin/bash\ntar czf /tmp/backup.tar.gz *\n")
+    env = os.environ.copy()
+    env.pop("ANTHROPIC_API_KEY", None)
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "--script", str(script)],
+        capture_output=True, text=True, env=env, cwd=str(tmp_path)
+    )
+    assert result.returncode != 0
+    assert "ANTHROPIC_API_KEY" in result.stdout or "ANTHROPIC_API_KEY" in result.stderr
+
+
+def test_cli_script_missing_file(tmp_path):
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "--script", str(tmp_path / "nonexistent.sh")],
+        capture_output=True, text=True, cwd=str(tmp_path),
+        env={**os.environ, "ANTHROPIC_API_KEY": "dummy"}
+    )
+    assert result.returncode != 0
+    assert "not found" in result.stdout.lower() or "not found" in result.stderr.lower()
+
+
+def test_cli_script_generates_weaponized_file(tmp_path):
+    import json
+    script = tmp_path / "backup.sh"
+    script.write_text("#!/bin/bash\ntar czf /tmp/backup.tar.gz *\n")
+    mock_json = json.dumps({
+        "vulnerabilities": [
+            {"name": "Wildcard injection", "severity": "critical", "line": 2,
+             "detail": "tar * allows checkpoint file injection."}
+        ],
+        "exploitation": "Plant --checkpoint-action files in the backup directory.",
+        "weaponization_strategy": "adds SUID to /bin/bash on execution",
+        "language": "bash",
+        "weaponized_script": "#!/bin/bash\nchmod u+s /bin/bash\n",
+    })
+
+    with patch("anthropic.Anthropic") as mock_cls:
+        mock_client = MagicMock()
+        mock_cls.return_value = mock_client
+        mock_resp = MagicMock()
+        mock_resp.content = [MagicMock(text=mock_json)]
+        mock_resp.usage = MagicMock(input_tokens=200, output_tokens=100)
+        mock_client.messages.create.return_value = mock_resp
+
+        import ttpx
+        import sys
+        old_argv = sys.argv
+        sys.argv = ["ttpx", "--script", str(script), "-d", "runs as root via cronjob"]
+        old_cwd = os.getcwd()
+        os.chdir(tmp_path)
+        try:
+            try:
+                ttpx.main()
+            except SystemExit:
+                pass
+        finally:
+            sys.argv = old_argv
+            os.chdir(old_cwd)
+
+    out = tmp_path / "weaponized_backup.sh"
+    assert out.exists()
+    assert "chmod u+s /bin/bash" in out.read_text()
+
+
+def test_cli_script_warns_on_non_sh_py_extension(tmp_path):
+    script = tmp_path / "cleanup.rb"
+    script.write_text("puts 'hello'\n")
+    result = subprocess.run(
+        ["python", str(Path.home() / "Tools" / "ttpx.py"), "--script", str(script)],
+        capture_output=True, text=True, cwd=str(tmp_path),
+        env={**os.environ, "ANTHROPIC_API_KEY": "dummy"}
+    )
+    # Should warn but not exit 1 before trying (will fail at Claude call with dummy key)
+    combined = result.stdout + result.stderr
+    assert "Warning" in combined or "warning" in combined
