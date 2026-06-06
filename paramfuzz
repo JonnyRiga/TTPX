@@ -1,0 +1,428 @@
+#!/bin/bash
+
+DEFAULT_WORDLIST="/usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt"
+AVAILABLE_MODULES=(lfi sqli sqli_time xss ssti cmdi redirect headers)
+INJECTABLE_HEADERS=(Referer User-Agent X-Forwarded-For X-Forwarded-Host X-Real-IP X-Original-URL X-Rewrite-URL X-Forwarded-Proto)
+
+show_help() {
+    echo "Usage: paramfuzz -u URL [OPTIONS]"
+    echo
+    echo "Discovers hidden GET/POST params via ffuf, then runs vuln triage probes"
+    echo "against each hit. Suggests specialist-tool commands for confirmed hits."
+    echo
+    echo "DISCOVERY"
+    echo "  -u URL       Target URL (required)"
+    echo "  -p PARAMS    Known params to include (e.g. \"foo=bar&baz=qux\")"
+    echo "  -d DATA      POST body data (auto-switches to POST)"
+    echo "  -H HEADER    Add header, repeatable"
+    echo "  -b COOKIE    Cookie string"
+    echo "  -w WORDLIST  Wordlist (default: burp-parameter-names.txt)"
+    echo "  -fs SIZE     Filter size — omit to auto-baseline (auto-detects dynamic pages)"
+    echo "  -ac          Force ffuf auto-calibration"
+    echo "  -t THREADS   Threads"
+    echo "  -o OUTFILE   Save ffuf results (JSON)"
+    echo "  -x PROXY     Proxy URL (e.g. http://127.0.0.1:8080)"
+    echo
+    echo "TRIAGE"
+    echo "  -M [MODS]    Comma-separated modules; omit value to run all:"
+    echo "                 ${AVAILABLE_MODULES[*]}"
+    echo "               (headers module is independent of discovery — sweeps"
+    echo "                injectable headers regardless of params found)"
+    echo "  -A           Shortcut for -M all"
+    echo "  --no-handoff Suppress handoff suggestions (handoff is ON by default)"
+    echo "  --skip-fuzz  Skip discovery; only probe known params (-p / inline / headers)"
+    echo
+    echo "Examples:"
+    echo "  paramfuzz -u \"http://target/page.php?foo=bar\"               # discovery only"
+    echo "  paramfuzz -u \"http://target/page.php?foo=bar\" -A             # full triage"
+    echo "  paramfuzz -u \"http://target/page.php?foo=bar\" -M sqli,xss    # selected modules"
+    echo "  paramfuzz -u \"http://target/page.php?id=1\" --skip-fuzz -M    # triage only"
+    echo "  paramfuzz -u \"http://target/\" --skip-fuzz -M headers         # header sweep only"
+}
+
+if [[ "$1" == "-h" || "$1" == "--help" || $# -eq 0 ]]; then
+    show_help
+    exit 0
+fi
+
+URL=""; PARAMS=""; POST_DATA=""; HEADERS=(); COOKIE=""
+WORDLIST="$DEFAULT_WORDLIST"; FS=""; AC=false; THREADS=""; OUTFILE=""; PROXY=""
+MODULES=""; HANDOFF=true; SKIP_FUZZ=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -u)         URL="$2";        shift 2 ;;
+        -p)         PARAMS="$2";     shift 2 ;;
+        -d)         POST_DATA="$2";  shift 2 ;;
+        -H)         HEADERS+=("$2"); shift 2 ;;
+        -b)         COOKIE="$2";     shift 2 ;;
+        -w)         WORDLIST="$2";   shift 2 ;;
+        -fs)        FS="$2";         shift 2 ;;
+        -ac)        AC=true;         shift ;;
+        -t)         THREADS="$2";    shift 2 ;;
+        -o)         OUTFILE="$2";    shift 2 ;;
+        -x)         PROXY="$2";      shift 2 ;;
+        -M)
+            # -M with no value (or followed by another flag) = "all"
+            if [[ -z "$2" || "$2" == -* ]]; then
+                MODULES="all"; shift
+            else
+                MODULES="$2"; shift 2
+            fi ;;
+        -A)         MODULES="all";   shift ;;
+        --no-handoff) HANDOFF=false; shift ;;
+        --skip-fuzz) SKIP_FUZZ=true; shift ;;
+        *) echo "Unknown option: $1"; show_help; exit 1 ;;
+    esac
+done
+
+[[ -z "$URL" ]] && { echo "Error: -u URL is required."; exit 1; }
+[[ "$SKIP_FUZZ" == "true" && -z "$MODULES" ]] && { echo "Error: --skip-fuzz requires -M MODULES."; exit 1; }
+
+# Always set cleanup trap up front (probes create /tmp/pf_headers.$$ regardless of fuzz mode)
+TMP_WORDLIST=""
+trap 'rm -f /tmp/pf_headers.$$ /tmp/pf_ffuf.$$; [[ -n "$TMP_WORDLIST" ]] && rm -f "$TMP_WORDLIST"' EXIT
+
+# Method
+[[ -n "$POST_DATA" ]] && METHOD="POST" || METHOD="GET"
+
+# Extract inline params, merge with -p
+if [[ "$URL" == *"?"* ]]; then
+    INLINE_PARAMS="${URL#*\?}"; BASE_URL="${URL%%\?*}"
+    [[ -n "$PARAMS" ]] && ALL_PARAMS="${INLINE_PARAMS}&${PARAMS}" || ALL_PARAMS="$INLINE_PARAMS"
+else
+    BASE_URL="$URL"; ALL_PARAMS="$PARAMS"
+fi
+
+# Collect known names
+KNOWN_NAMES=()
+SOURCE_PARAMS=""
+[[ "$METHOD" == "GET" ]] && SOURCE_PARAMS="$ALL_PARAMS" || SOURCE_PARAMS="$POST_DATA"
+if [[ -n "$SOURCE_PARAMS" ]]; then
+    IFS='&' read -ra PAIRS <<< "$SOURCE_PARAMS"
+    for pair in "${PAIRS[@]}"; do KNOWN_NAMES+=("${pair%%=*}"); done
+fi
+
+# URL-encode helper
+urlencode() {
+    python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1" 2>/dev/null \
+    || jq -sRr @uri <<< "$1"
+}
+
+# Send a request with one param overridden by payload, return body
+# Args: param_name, payload
+send_probe() {
+    local pname="$1" payload="$2" encoded
+    encoded=$(urlencode "$payload")
+
+    local CURL=(curl -sk --max-time 10 -o - -D /tmp/pf_headers.$$)
+    [[ -n "$COOKIE" ]] && CURL+=(-b "$COOKIE")
+    [[ -n "$PROXY" ]]  && CURL+=(-x "$PROXY")
+    for h in "${HEADERS[@]}"; do CURL+=(-H "$h"); done
+
+    if [[ "$METHOD" == "GET" ]]; then
+        local q
+        if [[ -n "$ALL_PARAMS" ]]; then
+            q="${ALL_PARAMS}&${pname}=${encoded}"
+        else
+            q="${pname}=${encoded}"
+        fi
+        "${CURL[@]}" "${BASE_URL}?${q}"
+    else
+        local body
+        if [[ -n "$POST_DATA" ]]; then
+            body="${POST_DATA}&${pname}=${encoded}"
+        else
+            body="${pname}=${encoded}"
+        fi
+        "${CURL[@]}" -X POST -d "$body" "$BASE_URL"
+    fi
+}
+
+# Like send_probe but returns time_total in seconds (decimal) instead of body
+send_probe_timed() {
+    local pname="$1" payload="$2" encoded
+    encoded=$(urlencode "$payload")
+
+    local CURL=(curl -sk --max-time 15 -o /dev/null -w "%{time_total}")
+    [[ -n "$COOKIE" ]] && CURL+=(-b "$COOKIE")
+    [[ -n "$PROXY" ]]  && CURL+=(-x "$PROXY")
+    for h in "${HEADERS[@]}"; do CURL+=(-H "$h"); done
+
+    if [[ "$METHOD" == "GET" ]]; then
+        local q
+        [[ -n "$ALL_PARAMS" ]] && q="${ALL_PARAMS}&${pname}=${encoded}" || q="${pname}=${encoded}"
+        "${CURL[@]}" "${BASE_URL}?${q}"
+    else
+        local body
+        [[ -n "$POST_DATA" ]] && body="${POST_DATA}&${pname}=${encoded}" || body="${pname}=${encoded}"
+        "${CURL[@]}" -X POST -d "$body" "$BASE_URL"
+    fi
+}
+
+# Module probes — each prints "TYPE|description" on hit, returns 0; else returns 1
+probe_lfi() {
+    local body; body=$(send_probe "$1" "../../../../../../etc/passwd")
+    echo "$body" | grep -qE 'root:[^:]*:0:0:' && { echo "LFI|/etc/passwd reflected"; return 0; }
+    return 1
+}
+probe_sqli() {
+    local body; body=$(send_probe "$1" "1'\"")
+    echo "$body" | grep -qiE 'sql syntax|mysql_|ORA-[0-9]|postgresql|sqlite_|odbc_|unclosed quotation|syntax error.*query' \
+        && { echo "SQLI|error-based response"; return 0; }
+    return 1
+}
+probe_sqli_time() {
+    # Baseline timing
+    local t_baseline; t_baseline=$(send_probe_timed "$1" "1")
+    # SLEEP payload — try MySQL/MariaDB syntax (most common)
+    local t_sleep; t_sleep=$(send_probe_timed "$1" "1' AND SLEEP(5)-- -")
+    # If sleep response is >4s slower than baseline, likely time-based SQLi
+    if python3 -c "exit(0 if float('${t_sleep}') - float('${t_baseline}') > 4 else 1)" 2>/dev/null; then
+        echo "SQLI|time-based blind (baseline=${t_baseline}s sleep=${t_sleep}s)"
+        return 0
+    fi
+    return 1
+}
+probe_xss() {
+    local marker="pfzz$$x"
+    local body; body=$(send_probe "$1" "<${marker}>test</${marker}>")
+    echo "$body" | grep -qF "<${marker}>" && { echo "XSS|payload reflected unescaped"; return 0; }
+    return 1
+}
+probe_ssti() {
+    # Negative control — bail if "49" already appears on the page unsolicited.
+    local neg; neg=$(send_probe "$1" 'pfssti$$z')
+    echo "$neg" | grep -qE '(^|[^0-9])49([^0-9]|$)' && return 1
+
+    local payloads=(
+        '{{7*7}}|Jinja2/Twig/Nunjucks'
+        '${7*7}|Java EL/FreeMarker/Spring'
+        '<%= 7*7 %>|ERB/EJS'
+        '#{7*7}|Ruby (Slim/Pug)/Smarty'
+        '*{7*7}|Thymeleaf'
+        '@(7*7)|Razor'
+        '${{7*7}}|Handlebars-style'
+    )
+
+    local entry payload label body
+    for entry in "${payloads[@]}"; do
+        payload="${entry%%|*}"; label="${entry##*|}"
+        body=$(send_probe "$1" "$payload")
+        if echo "$body" | grep -qE '(^|[^0-9])49([^0-9]|$)'; then
+            echo "SSTI|${payload} evaluated to 49 (${label})"
+            return 0
+        fi
+    done
+    return 1
+}
+probe_cmdi() {
+    local body; body=$(send_probe "$1" ';id;')
+    echo "$body" | grep -qE 'uid=[0-9]+\(' && { echo "CMDI|id command output reflected"; return 0; }
+    body=$(send_probe "$1" '|id')
+    echo "$body" | grep -qE 'uid=[0-9]+\(' && { echo "CMDI|id command output reflected"; return 0; }
+    return 1
+}
+# Sweep injectable headers, looking for reflection in the response body.
+# Doesn't take a param — runs once. Prints its own [+] lines.
+run_header_sweep() {
+    local marker="pfhdrz$$"
+    local hit_any=false
+    local CURL_BASE=(curl -sk --max-time 10)
+    [[ -n "$COOKIE" ]] && CURL_BASE+=(-b "$COOKIE")
+    [[ -n "$PROXY" ]]  && CURL_BASE+=(-x "$PROXY")
+    for h in "${HEADERS[@]}"; do CURL_BASE+=(-H "$h"); done
+
+    for hdr in "${INJECTABLE_HEADERS[@]}"; do
+        local CURL=("${CURL_BASE[@]}" -H "${hdr}: ${marker}")
+        local body
+        if [[ "$METHOD" == "GET" ]]; then
+            local target="$BASE_URL"
+            [[ -n "$ALL_PARAMS" ]] && target="${BASE_URL}?${ALL_PARAMS}"
+            body=$("${CURL[@]}" "$target")
+        else
+            body=$("${CURL[@]}" -X POST -d "$POST_DATA" "$BASE_URL")
+        fi
+        if echo "$body" | grep -qF "$marker"; then
+            printf "[+] %-20s [%-8s] reflected in response body\n" "$hdr" "HEADER"
+            [[ "$HANDOFF" == "true" ]] && echo "    -> manually probe ${hdr} for SSTI/SQLi/LFI (try {{7*7}}, ', ../etc/passwd)"
+            hit_any=true
+        fi
+    done
+    [[ "$hit_any" == "false" ]] && echo "[-] headers              no reflections detected"
+}
+
+probe_redirect() {
+    send_probe "$1" "//evil.paramfuzz.test/" >/dev/null
+    grep -qiE '^location:.*evil\.paramfuzz\.test' /tmp/pf_headers.$$ \
+        && { echo "REDIRECT|Location header points to attacker domain"; return 0; }
+    return 1
+}
+
+# Print handoff suggestion
+print_handoff() {
+    local pname="$1" vuln="$2"
+    local target_url post_flag=""
+    if [[ "$METHOD" == "GET" ]]; then
+        if [[ -n "$ALL_PARAMS" ]]; then
+            target_url="${BASE_URL}?${ALL_PARAMS}&${pname}=test"
+        else
+            target_url="${BASE_URL}?${pname}=test"
+        fi
+    else
+        target_url="$BASE_URL"
+        local post_data_with_param
+        [[ -n "$POST_DATA" ]] && post_data_with_param="${POST_DATA}&${pname}=test" || post_data_with_param="${pname}=test"
+        post_flag="--data \"$post_data_with_param\""
+    fi
+    case "$vuln" in
+        SQLI)
+            if [[ "$METHOD" == "POST" ]]; then
+                echo "    -> sqlmap -u \"$target_url\" $post_flag -p $pname --batch"
+            else
+                echo "    -> sqlmap -u \"$target_url\" -p $pname --batch"
+            fi ;;
+        XSS)      echo "    -> dalfox url \"$target_url\" -p $pname" ;;
+        SSTI)     echo "    -> sstimap -u \"$target_url\" -P $pname  (or: tplmap -u \"$target_url\" -p $pname)" ;;
+        LFI)
+            if [[ "$METHOD" == "POST" ]]; then
+                echo "    -> manual: curl -X POST -d \"${POST_DATA}&${pname}=/var/log/nginx/access.log\" \"$BASE_URL\""
+            else
+                echo "    -> manual: curl \"${BASE_URL}?${pname}=/var/log/nginx/access.log\""
+            fi ;;
+        CMDI)     echo "    -> commix -u \"$target_url\" -p $pname" ;;
+        REDIRECT)
+            if [[ "$METHOD" == "POST" ]]; then
+                echo "    -> manual: curl -X POST -d \"${POST_DATA}&${pname}=//attacker/\" \"$BASE_URL\" -v (check Location header)"
+            else
+                echo "    -> manual: test \"${BASE_URL}?${pname}=//attacker/\" with various encodings"
+            fi ;;
+    esac
+}
+
+# Resolve module list
+resolve_modules() {
+    [[ -z "$MODULES" ]] && return
+    if [[ "$MODULES" == "all" ]]; then
+        SELECTED_MODULES=("${AVAILABLE_MODULES[@]}")
+    else
+        IFS=',' read -ra SELECTED_MODULES <<< "$MODULES"
+        for mod in "${SELECTED_MODULES[@]}"; do
+            local valid=false
+            for avail in "${AVAILABLE_MODULES[@]}"; do
+                [[ "$mod" == "$avail" ]] && { valid=true; break; }
+            done
+            [[ "$valid" == "false" ]] && { echo "Error: unknown module '$mod'. Available: ${AVAILABLE_MODULES[*]}"; exit 1; }
+        done
+    fi
+}
+SELECTED_MODULES=()
+resolve_modules
+
+# Discovery via ffuf
+HITS=()
+if [[ "$SKIP_FUZZ" == "false" ]]; then
+    # Build dedup wordlist
+    EFFECTIVE_WORDLIST="$WORDLIST"
+    if [[ ${#KNOWN_NAMES[@]} -gt 0 ]]; then
+        TMP_WORDLIST=$(mktemp /tmp/paramfuzz.XXXXXX)
+        grep -vxF "$(printf '%s\n' "${KNOWN_NAMES[@]}")" "$WORDLIST" > "$TMP_WORDLIST"
+        EFFECTIVE_WORDLIST="$TMP_WORDLIST"
+    fi
+
+    # Build fuzz target
+    if [[ "$METHOD" == "GET" ]]; then
+        if [[ -n "$ALL_PARAMS" ]]; then
+            FUZZ_URL="${BASE_URL}?${ALL_PARAMS}&FUZZ=test"
+            BASELINE_URL="${BASE_URL}?${ALL_PARAMS}"
+        else
+            FUZZ_URL="${BASE_URL}?FUZZ=test"; BASELINE_URL="${BASE_URL}"
+        fi
+    else
+        FUZZ_URL="$BASE_URL"
+        BASELINE_URL="$BASE_URL"
+        [[ -n "$POST_DATA" ]] && FUZZ_DATA="${POST_DATA}&FUZZ=test" || FUZZ_DATA="FUZZ=test"
+        BASELINE_DATA="$POST_DATA"
+    fi
+
+    # Baseline — sample twice to auto-detect dynamic pages
+    if [[ -z "$FS" && "$AC" == "false" ]]; then
+        echo "[*] Sampling baseline (2 requests)..."
+        CURL_CMD=(curl -s -o /dev/null -w "%{size_download}")
+        [[ -n "$COOKIE" ]] && CURL_CMD+=(-b "$COOKIE")
+        [[ -n "$PROXY" ]]  && CURL_CMD+=(-x "$PROXY")
+        for h in "${HEADERS[@]}"; do CURL_CMD+=(-H "$h"); done
+        if [[ "$METHOD" == "POST" ]]; then
+            CURL_CMD+=(-X POST -d "$BASELINE_DATA" "$BASELINE_URL")
+        else
+            CURL_CMD+=("$BASELINE_URL")
+        fi
+        SIZE1=$("${CURL_CMD[@]}")
+        SIZE2=$("${CURL_CMD[@]}")
+        if [[ "$SIZE1" == "$SIZE2" ]]; then
+            FS="$SIZE1"
+            echo "[*] Stable baseline: $FS"
+        else
+            AC=true
+            echo "[*] Dynamic page detected ($SIZE1 vs $SIZE2) — switching to auto-calibration"
+        fi
+    fi
+
+    # Run ffuf
+    FFUF_OUT="/tmp/pf_ffuf.$$"
+    FFUF_CMD=(ffuf -c -w "$EFFECTIVE_WORDLIST" -mc all -o "$FFUF_OUT" -of json)
+    [[ "$AC" == "true" ]] && FFUF_CMD+=(-ac) || FFUF_CMD+=(-fs "$FS")
+    if [[ "$METHOD" == "POST" ]]; then
+        FFUF_CMD+=(-X POST -d "$FUZZ_DATA" -u "$FUZZ_URL" -H "Content-Type: application/x-www-form-urlencoded")
+    else
+        FFUF_CMD+=(-u "$FUZZ_URL")
+    fi
+    [[ -n "$COOKIE" ]]  && FFUF_CMD+=(-b "$COOKIE")
+    [[ -n "$PROXY" ]]   && FFUF_CMD+=(-x "$PROXY")
+    [[ -n "$THREADS" ]] && FFUF_CMD+=(-t "$THREADS")
+    for h in "${HEADERS[@]}"; do FFUF_CMD+=(-H "$h"); done
+
+    "${FFUF_CMD[@]}"
+
+    # Extract hits
+    if [[ -f "$FFUF_OUT" ]]; then
+        mapfile -t HITS < <(jq -r '.results[].input.FUZZ' "$FFUF_OUT" 2>/dev/null)
+    fi
+
+    [[ -n "$OUTFILE" ]] && cp "$FFUF_OUT" "$OUTFILE"
+fi
+
+# In skip-fuzz mode, probe the known params
+if [[ "$SKIP_FUZZ" == "true" ]]; then
+    HITS=("${KNOWN_NAMES[@]}")
+fi
+
+# Run modules
+if [[ ${#SELECTED_MODULES[@]} -gt 0 && ${#HITS[@]} -gt 0 ]]; then
+    echo
+    echo "[*] Running triage modules: ${SELECTED_MODULES[*]}"
+    echo "[*] Targets: ${HITS[*]}"
+    echo
+    for pname in "${HITS[@]}"; do
+        [[ -z "$pname" ]] && continue
+        any_hit=false
+        for mod in "${SELECTED_MODULES[@]}"; do
+            [[ "$mod" == "headers" ]] && continue   # run once, not per-param
+            result=$(probe_"$mod" "$pname" 2>/dev/null)
+            if [[ -n "$result" ]]; then
+                vuln="${result%%|*}"; desc="${result#*|}"
+                printf "[+] %-20s [%-8s] %s\n" "$pname" "$vuln" "$desc"
+                [[ "$HANDOFF" == "true" ]] && print_handoff "$pname" "$vuln"
+                any_hit=true
+            fi
+        done
+        [[ "$any_hit" == "false" ]] && printf "[-] %-20s no vulns detected\n" "$pname"
+    done
+fi
+
+# Header sweep — runs once if 'headers' module is selected (independent of params)
+if [[ " ${SELECTED_MODULES[*]} " == *" headers "* ]]; then
+    echo
+    echo "[*] Sweeping injectable headers: ${INJECTABLE_HEADERS[*]}"
+    run_header_sweep
+fi

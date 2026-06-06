@@ -35,7 +35,6 @@ tmux_ip_status.sh
 install_tools.sh
 linpeas.sh
 linux_priv_esc.py
-paramfuzz
 pspy
 nc64.exe
 winpeas.exe
