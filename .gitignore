@@ -57,3 +57,16 @@ hacktrix-session.log
 # misc
 .claude/
 vfuzzer
+aliases.txt
+
+# windows/AD tools
+GodPotato.exe
+PassTheCert/
+SeBackupPrivilege/
+ntlm_theft/
+
+# docker service dirs
+sysreptor/
+
+# third-party tools
+wmiexec2/
