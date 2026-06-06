@@ -67,7 +67,7 @@ Pattern used by all three existing modes:
 
 Standalone bash script (`~/Tools/paramfuzz`). Parameter discovery + vuln triage in one pass.
 
-**Flow:** baseline sample → `ffuf` param discovery → probe each hit with selected modules → print results + handoff suggestions.
+**Flow:** `ffuf -ac` param discovery → probe each hit with selected modules → print results + handoff suggestions. Uses ffuf's own auto-calibration by default; `-fs SIZE` overrides it.
 
 **Modules:** `lfi`, `sqli` (error-based), `sqli_time` (MySQL `SLEEP(5)`, timed via `python3`), `xss` (tag reflection), `ssti` (7×7=49 across 7 engines), `cmdi` (`id` reflection), `redirect` (open redirect via `Location:` header), `headers` (injectable header sweep — independent of param discovery).
 
