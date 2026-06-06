@@ -63,6 +63,23 @@ Pattern used by all three existing modes:
 4. Wire up in `main()` under a new `argparse` argument group.
 5. Guard the mode behind `if not os.environ.get("ANTHROPIC_API_KEY")` with a clear error message.
 
+## paramfuzz
+
+Standalone bash script (`~/Tools/paramfuzz`). Parameter discovery + vuln triage in one pass.
+
+**Flow:** baseline sample → `ffuf` param discovery → probe each hit with selected modules → print results + handoff suggestions.
+
+**Modules:** `lfi`, `sqli` (error-based), `sqli_time` (MySQL `SLEEP(5)`, timed via `python3`), `xss` (tag reflection), `ssti` (7×7=49 across 7 engines), `cmdi` (`id` reflection), `redirect` (open redirect via `Location:` header), `headers` (injectable header sweep — independent of param discovery).
+
+**Key internals:**
+- `send_probe(pname, payload)` — fires one curl request with the param overridden, returns body
+- `send_probe_timed(pname, payload)` — same but returns `time_total` float via `-w "%{time_total}"`
+- `run_header_sweep()` — iterates `INJECTABLE_HEADERS`, injects a unique marker, checks body reflection
+- `print_handoff(pname, vuln)` — emits the right follow-up command (`sqlmap`, `dalfox`, `sstimap`, `commix`) with correct `--data` for POST mode
+- `resolve_modules()` — validates module names against `AVAILABLE_MODULES`, exits on typo
+
+**Dependencies:** `ffuf`, `curl`, `jq`, `python3` (no API key, fully offline).
+
 ## Shell Scripts
 
 The `.sh` files are standalone — no shared library, no imports. Each is self-contained. `privy.sh` / `privyctf.sh` and `mscanz.sh` are the most complex; the rest are simple wrappers.
