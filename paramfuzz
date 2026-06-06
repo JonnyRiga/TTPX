@@ -17,8 +17,7 @@ show_help() {
     echo "  -H HEADER    Add header, repeatable"
     echo "  -b COOKIE    Cookie string"
     echo "  -w WORDLIST  Wordlist (default: burp-parameter-names.txt)"
-    echo "  -fs SIZE     Filter size — omit to auto-baseline (auto-detects dynamic pages)"
-    echo "  -ac          Force ffuf auto-calibration"
+    echo "  -fs SIZE     Filter size — overrides default auto-calibration"
     echo "  -t THREADS   Threads"
     echo "  -o OUTFILE   Save ffuf results (JSON)"
     echo "  -x PROXY     Proxy URL (e.g. http://127.0.0.1:8080)"
@@ -46,7 +45,7 @@ if [[ "$1" == "-h" || "$1" == "--help" || $# -eq 0 ]]; then
 fi
 
 URL=""; PARAMS=""; POST_DATA=""; HEADERS=(); COOKIE=""
-WORDLIST="$DEFAULT_WORDLIST"; FS=""; AC=false; THREADS=""; OUTFILE=""; PROXY=""
+WORDLIST="$DEFAULT_WORDLIST"; FS=""; THREADS=""; OUTFILE=""; PROXY=""
 MODULES=""; HANDOFF=true; SKIP_FUZZ=false
 
 while [[ $# -gt 0 ]]; do
@@ -58,7 +57,6 @@ while [[ $# -gt 0 ]]; do
         -b)         COOKIE="$2";     shift 2 ;;
         -w)         WORDLIST="$2";   shift 2 ;;
         -fs)        FS="$2";         shift 2 ;;
-        -ac)        AC=true;         shift ;;
         -t)         THREADS="$2";    shift 2 ;;
         -o)         OUTFILE="$2";    shift 2 ;;
         -x)         PROXY="$2";      shift 2 ;;
@@ -334,44 +332,18 @@ if [[ "$SKIP_FUZZ" == "false" ]]; then
     if [[ "$METHOD" == "GET" ]]; then
         if [[ -n "$ALL_PARAMS" ]]; then
             FUZZ_URL="${BASE_URL}?${ALL_PARAMS}&FUZZ=test"
-            BASELINE_URL="${BASE_URL}?${ALL_PARAMS}"
         else
-            FUZZ_URL="${BASE_URL}?FUZZ=test"; BASELINE_URL="${BASE_URL}"
+            FUZZ_URL="${BASE_URL}?FUZZ=test"
         fi
     else
         FUZZ_URL="$BASE_URL"
-        BASELINE_URL="$BASE_URL"
         [[ -n "$POST_DATA" ]] && FUZZ_DATA="${POST_DATA}&FUZZ=test" || FUZZ_DATA="FUZZ=test"
-        BASELINE_DATA="$POST_DATA"
-    fi
-
-    # Baseline — sample twice to auto-detect dynamic pages
-    if [[ -z "$FS" && "$AC" == "false" ]]; then
-        echo "[*] Sampling baseline (2 requests)..."
-        CURL_CMD=(curl -s -o /dev/null -w "%{size_download}")
-        [[ -n "$COOKIE" ]] && CURL_CMD+=(-b "$COOKIE")
-        [[ -n "$PROXY" ]]  && CURL_CMD+=(-x "$PROXY")
-        for h in "${HEADERS[@]}"; do CURL_CMD+=(-H "$h"); done
-        if [[ "$METHOD" == "POST" ]]; then
-            CURL_CMD+=(-X POST -d "$BASELINE_DATA" "$BASELINE_URL")
-        else
-            CURL_CMD+=("$BASELINE_URL")
-        fi
-        SIZE1=$("${CURL_CMD[@]}")
-        SIZE2=$("${CURL_CMD[@]}")
-        if [[ "$SIZE1" == "$SIZE2" ]]; then
-            FS="$SIZE1"
-            echo "[*] Stable baseline: $FS"
-        else
-            AC=true
-            echo "[*] Dynamic page detected ($SIZE1 vs $SIZE2) — switching to auto-calibration"
-        fi
     fi
 
     # Run ffuf
     FFUF_OUT="/tmp/pf_ffuf.$$"
     FFUF_CMD=(ffuf -c -w "$EFFECTIVE_WORDLIST" -mc all -o "$FFUF_OUT" -of json)
-    [[ "$AC" == "true" ]] && FFUF_CMD+=(-ac) || FFUF_CMD+=(-fs "$FS")
+    [[ -n "$FS" ]] && FFUF_CMD+=(-fs "$FS") || FFUF_CMD+=(-ac)
     if [[ "$METHOD" == "POST" ]]; then
         FFUF_CMD+=(-X POST -d "$FUZZ_DATA" -u "$FUZZ_URL" -H "Content-Type: application/x-www-form-urlencoded")
     else
