@@ -330,14 +330,22 @@ if [[ "$SKIP_FUZZ" == "false" ]]; then
 
     # Build fuzz target
     if [[ "$METHOD" == "GET" ]]; then
-        if [[ -n "$ALL_PARAMS" ]]; then
+        if [[ "$ALL_PARAMS" == *"FUZZ"* ]]; then
+            FUZZ_URL="${BASE_URL}?${ALL_PARAMS}"
+        elif [[ -n "$ALL_PARAMS" ]]; then
             FUZZ_URL="${BASE_URL}?${ALL_PARAMS}&FUZZ=test"
         else
             FUZZ_URL="${BASE_URL}?FUZZ=test"
         fi
     else
         FUZZ_URL="$BASE_URL"
-        [[ -n "$POST_DATA" ]] && FUZZ_DATA="${POST_DATA}&FUZZ=test" || FUZZ_DATA="FUZZ=test"
+        if [[ "$POST_DATA" == *"FUZZ"* ]]; then
+            FUZZ_DATA="$POST_DATA"
+        elif [[ -n "$POST_DATA" ]]; then
+            FUZZ_DATA="${POST_DATA}&FUZZ=test"
+        else
+            FUZZ_DATA="FUZZ=test"
+        fi
     fi
 
     # Run ffuf
